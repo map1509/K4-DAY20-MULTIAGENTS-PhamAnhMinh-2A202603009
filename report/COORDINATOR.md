@@ -1,11 +1,12 @@
 # Coordinator theo yêu cầu bổ sung
 
-Repo gốc dùng Deep Agents và chưa có coordinator/base-agent riêng. Module bổ sung nằm ở `src/lab/coordinator.py`; `src/coordinator.py` cung cấp import tương thích với đường dẫn trong đề. Module này độc lập với harness Deep Agents và chưa được nối vào `lab.runner`. Không thay thế Phần 2 về thí nghiệm trong `GUIDE.md`.
+Repo gốc dùng Deep Agents và chưa có coordinator/base-agent riêng. Đã bổ sung mã triển khai ở `src/coordinator.py` và lớp cơ sở ở `src/base_agent.py` đúng đường dẫn trong đề. Import Coordinator bằng `from coordinator import Coordinator`. Module này độc lập với harness Deep Agents và chưa được nối vào `lab.runner`. Không thay thế Phần 2 về thí nghiệm trong `GUIDE.md`.
 
-Worker cần thuộc tính `name` duy nhất và phương thức async `process_async(content)`. Kết quả worker là dict chứa `type` (`data`, `code`, `evaluation`) và `content`. Không cần base class bắt buộc.
+Worker kế thừa `BaseAgent`, được khởi tạo với `name`, `model`, `system_prompt`, `tools` và logger riêng. Worker triển khai phương thức abstract async `process_async(content)`. Kết quả worker là dict chứa `type` (`data`, `code`, `evaluation`) và `content`. Coordinator cũng chấp nhận worker tương thích cùng giao diện.
 
 ```python
-from lab.coordinator import Coordinator
+from coordinator import Coordinator
+from base_agent import BaseAgent
 
 # workers là các đối tượng đáp ứng giao diện trên.
 coordinator = Coordinator(worker_agents=workers)
@@ -34,4 +35,8 @@ Kiểm tra:
 .\.venv\Scripts\python.exe scripts/test_coordinator_standalone.py
 ```
 
-Bộ test coordinator kiểm tra 10 trường hợp, gồm chạy đồng thời thực sự bằng barrier, partial result, timeout/cancellation, retry không lặp task thành công, input không hợp lệ, giới hạn task và luồng end-to-end. Standalone kiểm tra 3 trường hợp: một worker, nhiều worker, timeout/dọn task.
+Bộ test coordinator kiểm tra 14 trường hợp, gồm chạy đồng thời thực sự bằng barrier, partial result, timeout/cancellation, retry không lặp task thành công, input không hợp lệ, giới hạn task và luồng end-to-end. Standalone kiểm tra 3 trường hợp: một worker, nhiều worker, timeout/dọn task.
+
+Kết quả Phần 2.4: pytest đạt `14 passed`; standalone đạt `3/3`. Script dùng model giả với các câu input mẫu, in parse/routing/kết quả/thời gian, bật logging start/end/status. Trường hợp timeout dùng 0,02 giây để kiểm tra nhanh; fallback được thực hiện rõ ràng trong script bằng coordinator có worker giả nhanh, không phải cơ chế fallback tự động của Coordinator.
+
+Checklist Phần 2: đã đọc và triển khai `coordinator.py`, bổ sung `base_agent.py`, hoàn thành 5 hàm, timeout/exception/input validation/task limit/retry, test pytest và standalone. Routing dùng bảng tra cố định, không gọi mô hình. Input dict/JSON bỏ qua mô hình; văn bản tự do dùng model được truyền vào. Chưa triển khai cache phân loại văn bản tự do.

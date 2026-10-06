@@ -3,11 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from lab.coordinator import Coordinator, CoordinatorException
+from coordinator import Coordinator, CoordinatorException
+from base_agent import BaseAgent
 
 
-class MockWorker:
+class MockWorker(BaseAgent):
     def __init__(self, name="data_agent", kind="data", delay=0, fail=0):
+        super().__init__(name)
         self.name, self.kind, self.delay, self.fail = name, kind, delay, fail
         self.calls = 0
         self.cancelled = False
@@ -36,6 +38,9 @@ def test_coordinator_init():
     assert coordinator.task_queue is queue
     with pytest.raises(ValueError):
         Coordinator(worker_agents=[worker, worker])
+    with pytest.raises(TypeError):
+        BaseAgent("abstract")
+    assert worker.model is None and worker.tools == []
 
 
 def test_parse_request():
@@ -147,3 +152,61 @@ def test_end_to_end():
     assert result["status"] == "success"
     assert result["data"]["parameters"] == {"quarter": 3}
     assert result["code"]["request"]["task_type"] == "complex"
+
+
+def test_retry_after_timeout(caplog):
+    class SlowFirstWorker(MockWorker):
+        async def process_async(self, content):
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.sleep(10)
+            return {"type": "data", "content": content}
+    worker = SlowFirstWorker()
+    coordinator = Coordinator(worker_agents=[worker])
+    result = coordinator.execute_tasks_with_retry([task()], max_retries=1, timeout=0.02)
+    assert result["one"]["status"] == "success"
+    assert worker.calls == 2 and result["one"]["attempts"] == 2
+    assert "timeout" in caplog.text
+    assert not coordinator.active_tasks
+
+
+def test_invalid_model_response():
+    class InvalidModel:
+        def invoke(self, prompt):
+            return SimpleNamespace(content="not JSON")
+    with pytest.raises(CoordinatorException, match="parse model response"):
+        Coordinator(model=InvalidModel()).parse_request("Analyze sales")
+
+
+def test_resource_limit_across_concurrent_batches():
+    async def scenario():
+        started, release = asyncio.Event(), asyncio.Event()
+        class WaitingWorker(MockWorker):
+            async def process_async(self, content):
+                self.calls += 1
+                started.set()
+                await release.wait()
+                return {"type": "data", "content": content}
+        worker = WaitingWorker()
+        coordinator = Coordinator(worker_agents=[worker], max_tasks=1)
+        running = asyncio.create_task(coordinator.aexecute_tasks([task()], timeout=1))
+        try:
+            await asyncio.wait_for(started.wait(), timeout=1)
+            with pytest.raises(CoordinatorException, match="Active task limit"):
+                await coordinator.aexecute_tasks([task(tid="two")])
+            assert worker.calls == 1
+        finally:
+            release.set()
+            await running
+        assert not coordinator.active_tasks
+    asyncio.run(scenario())
+
+
+def test_invalid_worker_output():
+    class InvalidWorker(MockWorker):
+        async def process_async(self, content):
+            return {"content": "missing type"}
+    coordinator = Coordinator(worker_agents=[InvalidWorker()])
+    result = coordinator.execute_tasks([task()])
+    assert result["one"]["status"] == "error"
+    assert "WorkerError" in result["one"]["error"]
