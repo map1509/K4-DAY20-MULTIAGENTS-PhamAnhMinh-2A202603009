@@ -1,0 +1,24 @@
+{
+  "mode": "local_no_model",
+  "requests_per_mode": 20,
+  "modes": {
+    "uncached": {
+      "seconds": 0.30958060012198985,
+      "average_seconds": 0.015479030006099492,
+      "requests_per_minute": 3876.21187996645,
+      "task_messages": 20
+    },
+    "cached": {
+      "seconds": 0.03268579998984933,
+      "average_seconds": 0.0016342899994924664,
+      "requests_per_minute": 36713.19044883905,
+      "task_messages": 1,
+      "cache_stats": {
+        "hits": 19,
+        "misses": 1,
+        "bypasses": 0
+      }
+    }
+  },
+  "note": "Local CSV workload only; first cold cache miss included; no claim about live LLM throughput."
+}

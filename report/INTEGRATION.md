@@ -1,5 +1,7 @@
 # Phần 5.1: Test cases và hiệu suất
 
+Tài liệu này giữ lịch sử các lần chạy; các dòng nói về TODO/lỗi ở giai đoạn đầu không phải trạng thái hiện tại. Báo cáo nộp bài và số liệu mới nhất nằm trong `REPORT.md`.
+
 Đã tạo `tests/test_05_integration.py` với đúng 5 test trong đề: `test_coordinator_parse_request`, `test_coordinator_with_workers`, `test_full_pipeline`, `test_latency`, `test_concurrent_requests`. Dùng `asyncio.run` để chạy coroutine, không cần thêm pytest-asyncio. Routing model giả, còn workers, message queue, CSV tools, matplotlib subprocess và evaluator chạy thật cục bộ.
 
 Đã bổ sung `src/system.py`: `MultiAgentSystem.process` chạy Coordinator rồi giao kết quả cho Evaluator, có deadline cho toàn pipeline. `Coordinator.handle_request` cung cấp API async. Task ID được tạo riêng theo UUID cho mỗi request để 10 request đồng thời không trùng ID.

@@ -33,12 +33,6 @@ class WindowsShellBackend(LocalShellBackend):
         except subprocess.TimeoutExpired:
             return ExecuteResponse(output="Command timed out", exit_code=124, truncated=False)
 
-# TODO 1: import các thành phần cần dùng, ví dụ:
-#   from deepagents import create_deep_agent
-#   from deepagents.backends import LocalShellBackend
-#   from .model import make_model
-#   from .subagents import get_subagents
-
 # ---- CÓ SẴN, KHÔNG SỬA: system prompt dùng chung cho mọi sinh viên (để đường cơ sở so sánh được) ----
 PATHS_NOTE = (
     "PATHS: every path is relative to the sandbox root and never starts with '/'. "

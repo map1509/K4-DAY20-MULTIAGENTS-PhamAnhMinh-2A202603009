@@ -10,10 +10,37 @@ import logging
 import math
 import re
 import uuid
+import hashlib
+from collections import OrderedDict
+from copy import deepcopy
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from time import perf_counter
 from communication import MessageQueue
+
+
+class _ResultCache:
+    """Bounded TTL/LRU storage; callers receive independent copies."""
+    def __init__(self, max_entries, ttl):
+        self.entries = OrderedDict()
+        self.max_entries, self.ttl = max_entries, ttl
+
+    def get(self, key):
+        entry = self.entries.get(key)
+        if entry is None:
+            return None
+        expires, result = entry
+        if perf_counter() >= expires:
+            del self.entries[key]
+            return None
+        self.entries.move_to_end(key)
+        return deepcopy(result)
+
+    def put(self, key, result):
+        self.entries[key] = (perf_counter() + self.ttl, deepcopy(result))
+        self.entries.move_to_end(key)
+        while len(self.entries) > self.max_entries:
+            self.entries.popitem(last=False)
 
 
 class CoordinatorException(Exception):
@@ -312,3 +339,68 @@ class Coordinator:
 
     async def handle_request(self, user_input, timeout=60):
         return await self.aprocess(user_input, timeout)
+
+
+class CachingCoordinator(Coordinator):
+    """Bonus 6c: cache successful structured CSV reads; writes/code never cached.
+
+    File contents are hashed on each request to invalidate changes automatically.
+    Concurrent misses can perform duplicate reads; no cross-process persistence.
+    """
+    def __init__(self, *args, cache_ttl=60, cache_max_entries=32, **kwargs):
+        super().__init__(*args, **kwargs)
+        if isinstance(cache_ttl, bool) or not isinstance(cache_ttl, (int, float)) or not math.isfinite(cache_ttl) or cache_ttl <= 0:
+            raise ValueError("cache_ttl must be positive and finite")
+        if isinstance(cache_max_entries, bool) or not isinstance(cache_max_entries, int) or cache_max_entries < 1:
+            raise ValueError("cache_max_entries must be a positive integer")
+        self.cache = _ResultCache(cache_max_entries, cache_ttl)
+        self.cache_stats = {"hits": 0, "misses": 0, "bypasses": 0}
+
+    def clear_cache(self):
+        self.cache.entries.clear()
+
+    def _cache_key(self, request):
+        if not isinstance(request, Mapping) or request.get("task_type") != "data_analysis":
+            return None
+        parsed = self.parse_request(request)
+        params = parsed["parameters"]
+        if params.get("operation") not in {"analyze_csv", "pandas_analysis", "csv_parser"}:
+            return None
+        worker = self.workers.get("data_agent")
+        if not callable(getattr(worker, "resolve_path", None)):
+            return None
+        try:
+            path = worker.resolve_path(params.get("path"))
+            if path.suffix.lower() != ".csv":
+                return None
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(65536), b""):
+                    digest.update(chunk)
+            scope = [request, str(path), digest.hexdigest(), id(worker), id(getattr(worker, "model", None))]
+            return hashlib.sha256(json.dumps(scope, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+        except (OSError, ValueError, TypeError):
+            return None
+
+    async def handle_request(self, user_input, timeout=60):
+        # Validate deadline on hits too, matching the uncached API contract.
+        self._validate_tasks([], timeout)
+        return await asyncio.wait_for(self._handle_cached(user_input, timeout), timeout)
+
+    async def _handle_cached(self, user_input, timeout):
+        key = await asyncio.to_thread(self._cache_key, user_input)
+        if key is None:
+            self.cache_stats["bypasses"] += 1
+            return await super().handle_request(user_input, timeout)
+        cached = self.cache.get(key)
+        if cached is not None:
+            self.cache_stats["hits"] += 1
+            self.logger.info("Result cache hit")
+            cached["cache"] = {"hit": True}
+            return cached
+        self.cache_stats["misses"] += 1
+        result = await super().handle_request(user_input, timeout)
+        if result["status"] == "success" and await asyncio.to_thread(self._cache_key, user_input) == key:
+            self.cache.put(key, result)
+        result["cache"] = {"hit": False}
+        return result

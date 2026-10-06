@@ -97,7 +97,7 @@ Harness gốc dùng backend Windows với Git Bash có sẵn và environment đ�
 
 ## 4. Test results
 
-**69/69 passed**, không skip. Statement coverage toàn src: **81,18%**, 1.234/1.520 statements.
+Sau bonus, kiểm tra ngày 07/10/2026: **73/73 passed**, không skip. Statement coverage toàn src: **81,94%**, 1.307/1.595 statements.
 
 | Nhóm | Passed |
 |---|---|
@@ -107,7 +107,8 @@ Harness gốc dùng backend Windows với Git Bash có sẵn và environment đ�
 | BaseWorker | 7/7 |
 | Integration/E2E/performance/regression | 8/8 |
 | Provided/agent/runner/curator gốc | 32/32 |
-| Tổng | 69/69 |
+| Bonus caching | 4/4 |
+| Tổng | 73/73 |
 
 Integration kiểm tra coordinator-worker-tool, full pipeline, latency local và 10 yêu cầu đồng thời. Regression kiểm tra tạo/chạy script một lượt model, routing với offline workers và che secret trong log.
 
@@ -117,7 +118,7 @@ Error cases gồm timeout/cleanup, retry exhaustion, invalid model response, wor
 .venv\Scripts\python.exe -m pytest tests/ -o addopts='-p no:cacheprovider' -q --tb=short --cov=src --cov-report=term-missing --cov-report=json:results/coverage.json
 ```
 
-Suite có coverage mất 54,66s. Không loại module khỏi mẫu số; REPL subprocess chưa instrument nên _repl_worker.py ghi 0%. Coverage dòng không chứng minh hết mọi nhánh. Báo cáo chi tiết: results/coverage.json.
+Suite trước bonus có coverage mất 54,66s; chưa lưu thời gian tổng lần chạy bonus. Không loại module khỏi mẫu số; REPL subprocess chưa instrument nên _repl_worker.py ghi 0%. Coverage dòng không chứng minh hết mọi nhánh. Báo cáo chi tiết mới nhất: results/coverage.json.
 
 ## 5. Performance analysis
 
@@ -167,8 +168,8 @@ Queue không drop-oldest hoặc có test overflow giả định. Ứng dụng ch
 | Coordinator + 3 workers | Đủ bốn vai trò và tools riêng | Đạt |
 | Async communication | Mailboxes/correlation/gather/deadline | Một process |
 | Collaboration | Data → Code với upstream_data → Evaluator | Phần phụ thuộc tuần tự |
-| 23+ tests, all pass | 69/69 | Đạt |
-| Coverage >80% | 81,18% | Đạt statement coverage |
+| 23+ tests, all pass | 73/73 | Đạt |
+| Coverage >80% | 81,94% | Đạt statement coverage |
 | Latency/throughput/token | Mục 5 | Đạt trong mẫu |
 | Utilization mỗi worker 70–90% | Data 47,031%; Code 62,345%; Evaluator 0,102% | Chưa đạt |
 | Python sandbox | Subprocess/resource/AST limits | Chưa isolation OS |
@@ -194,7 +195,7 @@ Scale ngang cần broker ngoài process, worker replicas, persistent task state 
 
 ## 10. Kết luận & đề xuất tiếp theo
 
-Đã xây dựng Coordinator/Data/Code/Evaluator với tools và giao tiếp async, kiểm chứng 69/69 tests và coverage 81,18%. Benchmark cuối đạt 9/9 cùng mục tiêu P50/P99/throughput/token trong mẫu. Utilization 70–90% cho mọi worker chưa đạt do workload và thời lượng không cân bằng. Tiếp theo cần validation nội dung artifacts, tải dài hạn và queue/state có giới hạn. Triển khai ngoài lab cần isolation mạnh hơn, broker persistent và idempotency.
+Đã xây dựng Coordinator/Data/Code/Evaluator với tools và giao tiếp async, kiểm chứng 73/73 tests và coverage 81,94% sau bonus 6c. Benchmark LLM đạt 9/9 cùng mục tiêu P50/P99/throughput/token trong mẫu; caching local đạt 19 hit/1 miss cho 20 requests. Utilization 70–90% cho mọi worker chưa đạt do workload và thời lượng không cân bằng. Tiếp theo cần validation nội dung artifacts, tải dài hạn và queue/state có giới hạn. Triển khai ngoài lab cần isolation mạnh hơn, broker persistent và idempotency.
 
 ## Phụ lục: checklist nộp bài
 
@@ -210,8 +211,42 @@ Scale ngang cần broker ngoài process, worker replicas, persistent task state 
 - [x] Phần 2–4: coordinator, workers, queue, SQL/REPL/file/evaluation tools.
 - [x] Phần 5: 23+ tests/all pass, coverage, benchmarks và phân tích.
 - [x] Phần 6: đủ 10 mục báo cáo theo yêu cầu mới nhất.
-- [ ] Bonus 6a–6e: tùy chọn, chưa thực hiện.
+- [x] Bonus 6c: Result Caching, có kiểm tra invalidation/TTL/bounds và benchmark local.
 - [x] Push GitHub: đã push branch main tới origin; bản báo cáo hoàn thiện ở commit 7b42dc1.
 - [ ] Submit: sinh viên sẽ tự nộp sau.
 
 Test/performance ở mục 4–5 theo Phần 6; mục 6 là resilience. Lịch sử debug/profiling ở report/INTEGRATION.md. Không dùng số liệu ví dụ của đề bài làm kết quả đo.
+
+### Bonus 6c: Result Caching (07/10/2026)
+
+`CachingCoordinator` trong `src/coordinator.py` kế thừa Coordinator và cung cấp cùng API `handle_request`. Cache chỉ áp dụng cho yêu cầu có cấu trúc `data_analysis` với operation `analyze_csv`, `pandas_analysis` hoặc `csv_parser` và nguồn CSV. Task tạo/sửa file, thực thi Python, SQL, text không có kế hoạch tường minh và kết quả lỗi đều không được cache.
+
+Key gồm request, đường dẫn workspace, SHA-256 nội dung CSV và worker/model identity. Hash lại sau khi xử lý để không lưu kết quả nếu file đã đổi. TTL mặc định 60s, tối đa 32 entries với LRU; có `clear_cache()`. Kết quả được deep-copy để caller không làm hỏng cache; `cache.hit` và `cache_stats` cho biết hit/miss/bypass. Cache hit giữ timestamp/task records của lần tính gốc; không giả lập một lần thực thi mới. Deadline bao phủ cả bước hash. Cache chưa persistent và concurrent misses có thể đọc trùng.
+
+```python
+from agents import DataAgent
+from coordinator import CachingCoordinator
+
+coordinator = CachingCoordinator(
+    worker_agents=[DataAgent(workspace="workspace")],
+    cache_ttl=60, cache_max_entries=32,
+)
+request = {"task_type": "data_analysis", "parameters": {
+    "operation": "analyze_csv", "path": "sales.csv", "column": "revenue"}}
+# Trong async function:
+# first = await coordinator.handle_request(request)
+# second = await coordinator.handle_request(request)  # cache.hit=True nếu CSV chưa đổi
+```
+
+Benchmark chạy `scripts/benchmark_cache.py`, 20 yêu cầu/mode trên CSV 10.000 rows, **không gọi LLM**, có cả cold miss đầu tiên:
+
+| Metric | Không cache | Có cache |
+|---|---|---|
+| Tổng thời gian | 0,309581s | 0,032686s |
+| Trung bình/request | 15,479ms | 1,634ms |
+| Task messages tới worker | 20 | 1 |
+| Cache hit/miss | Không áp dụng | 19/1 |
+
+Giảm khoảng 89,4% thời gian trong mẫu local. Không so throughput local này với benchmark LLM hoặc khẳng định token savings chưa đo. Metrics: `results/caching/8ea43209-9b5e-4215-8d5d-526cc9970127/metrics.json`. Tests: `tests/test_06_caching.py` kiểm tra copy isolation, file invalidation, TTL/LRU, error/write bypass và deadline/config validation.
+
+Utilization 70–90% của từng worker vẫn chưa đạt trong workload đã đo ở mục 8. Đây là mục tiêu phụ thuộc phân bố tải và định nghĩa capacity, không phải TODO chưa cài; caching giảm công việc worker nên cũng không bảo đảm nâng tỷ lệ này. Không thêm sleep hay công việc không cần thiết để làm đẹp số. Bước Submit vẫn do sinh viên tự thực hiện như đã yêu cầu.
