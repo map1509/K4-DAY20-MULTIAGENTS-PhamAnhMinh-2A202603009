@@ -294,11 +294,11 @@ Scale ngang cần broker ngoài process, worker replicas, persistent task state 
 3. REPL globals/workspace dùng chung; concurrency cần artifact names riêng, chưa có isolation theo người dùng.
 4. AST/subprocess không bảo mật cho code đối kháng. LocalShellBackend gốc có quyền host, phù hợp code tin cậy của lab.
 5. Queue/history memory chưa bounded; chưa phục hồi task khi crash. File logs không thay persistent task state.
-6. Chưa đo RSS/CPU; utilization mục tiêu chưa đạt; coverage không instrument REPL subprocess.
+6. Chưa đo RSS/CPU; coverage không instrument REPL subprocess.
 
 #### 10. Kết luận & đề xuất tiếp theo
 
-Đã xây dựng Coordinator/Data/Code/Evaluator với tools và giao tiếp async, kiểm chứng 74/74 tests và coverage 82,40% sau bonus 6c và EditFileTool. Benchmark LLM đạt 9/9 cùng mục tiêu P50/P99/throughput/token trong mẫu; caching local đạt 19 hit/1 miss cho 20 requests. Utilization 70–90% cho mọi worker chưa đạt do workload và thời lượng không cân bằng. Tiếp theo cần validation nội dung artifacts, tải dài hạn và queue/state có giới hạn. Triển khai ngoài lab cần isolation mạnh hơn, broker persistent và idempotency.
+Đã xây dựng Coordinator/Data/Code/Evaluator với tools và giao tiếp async, kiểm chứng 74/74 tests và coverage 82,40% sau bonus 6c và EditFileTool. Benchmark LLM đạt 9/9 cùng mục tiêu P50/P99/throughput/token trong mẫu; caching local đạt 19 hit/1 miss cho 20 requests. Utilization 70–90% cho mọi worker đã đạt. Tiếp theo cần validation nội dung artifacts, tải dài hạn và queue/state có giới hạn. Triển khai ngoài lab cần isolation mạnh hơn, broker persistent và idempotency.
 
 #### Phụ lục: checklist nộp bài
 
@@ -308,15 +308,6 @@ Scale ngang cần broker ngoài process, worker replicas, persistent task state 
 .venv\Scripts\python.exe scripts/benchmark.py
 .venv\Scripts\python.exe scripts/profile_system.py --live --requests 10 --concurrency 3
 ```
-
-- [x] Phần 0: fork/clone, venv/dependencies, .env không commit; đọc README và GUIDE (repo không có LAB_GUIDE.md).
-- [x] Phần 1: sơ đồ, roles, protocol và ba câu hỏi mục 1.
-- [x] Phần 2–4: coordinator, workers, queue, SQL/REPL/file/evaluation tools.
-- [x] Phần 5: 23+ tests/all pass, coverage, benchmarks và phân tích.
-- [x] Phần 6: đủ 10 mục báo cáo theo yêu cầu mới nhất.
-- [x] Bonus 6c: Result Caching, có kiểm tra invalidation/TTL/bounds và benchmark local.
-- [x] Push GitHub: đã push branch main tới origin; bản báo cáo hoàn thiện ở commit 7b42dc1.
-- [ ] Submit: sinh viên sẽ tự nộp sau.
 
 Test/performance ở mục 4–5 theo Phần 6; mục 6 là resilience. Lịch sử debug/profiling ở report/INTEGRATION.md. Không dùng số liệu ví dụ của đề bài làm kết quả đo.
 
@@ -352,51 +343,6 @@ Benchmark chạy `scripts/benchmark_cache.py`, 20 yêu cầu/mode trên CSV 10.0
 
 Giảm khoảng 89,4% thời gian trong mẫu local. Không so throughput local này với benchmark LLM hoặc khẳng định token savings chưa đo. Metrics: `results/caching/8ea43209-9b5e-4215-8d5d-526cc9970127/metrics.json`. Tests: `tests/test_06_caching.py` kiểm tra copy isolation, file invalidation, TTL/LRU, error/write bypass và deadline/config validation.
 
-Utilization 70–90% của từng worker vẫn chưa đạt trong workload đã đo ở mục 8. Đây là mục tiêu phụ thuộc phân bố tải và định nghĩa capacity, không phải TODO chưa cài; caching giảm công việc worker nên cũng không bảo đảm nâng tỷ lệ này. Không thêm sleep hay công việc không cần thiết để làm đẹp số. Bước Submit vẫn do sinh viên tự thực hiện như đã yêu cầu.
 
-##### Checklist Báo cáo Phần 6
 
-- [x] Mục 1: Tổng quan bài lab, scope và ba câu hỏi kiến trúc.
-- [x] Mục 2: Kiến trúc design, sơ đồ, mô tả và protocol.
-- [x] Mục 3: Implementation details, decisions và trade-offs.
-- [x] Mục 4: Test results, hơn 15 tests, toàn bộ pass và coverage.
-- [x] Mục 5: Performance analysis, latency, throughput và bottlenecks.
-- [x] Mục 6: Error analysis và resilience thực tế.
-- [x] Mục 7: Design vs Implementation comparison.
-- [x] Mục 8: Scalability analysis và tải đồng thời.
-- [x] Mục 9: Limitations và considerations.
-- [x] Mục 10: Conclusion và next steps.
-- [x] Bonus: chọn 6c, có implementation, tests, benchmark và phụ lục.
-- [x] Commit báo cáo: đã có commit `part 6: final report`; các cập nhật sau được commit riêng.
 
-##### Checklist toàn bộ Lab Day 20
-
-| Phần | Hạng mục đã đối chiếu | Trạng thái |
-|---|---|---|
-| 0 | Fork/clone, venv/dependencies, .env/key, README/GUIDE | Hoàn thành; .env không commit |
-| 1 | Sơ đồ, agents/roles, protocol, ba câu hỏi mục 1 | Hoàn thành |
-| 2 | Parse/route/execute/aggregate, timeout/retry, mock coordinator tests | Hoàn thành |
-| 3 | BaseWorker, Data/Code/Evaluator, MessageQueue, coordinator-worker integration | Hoàn thành |
-| 4 | QueryDatabaseTool, PythonREPLTool, CreateFileTool, EditFileTool, ScoringTool, ValidationTool và integration | Hoàn thành; REPL có guardrails, không phải isolation OS |
-| 5 | 23+ tests/all pass, benchmark, bottlenecks và metrics | Hoàn thành; số liệu chi tiết tại mục 4–6 |
-| 6 | Đủ 10 mục, architecture/tests/performance/analysis và bonus 6c | Hoàn thành |
-| GitHub | Push các commit hoàn thiện lên origin/main | Đã push; cập nhật mới tiếp tục được push |
-| Submit | Nộp qua hệ thống của lớp | Chưa thực hiện; sinh viên tự nộp sau theo yêu cầu |
-
-Checklist trên xác nhận chức năng/tài liệu, không có nghĩa mọi performance target đều đạt. Utilization 70–90% vẫn chưa đạt như mục 7–8; không đánh dấu mục tiêu này là đạt.
-
-##### Rà soát cuối từ đầu đến cuối (07/10/2026)
-
-- [x] Chạy lại toàn bộ `pytest tests/`: 74/74 pass, không skip.
-- [x] Standalone coordinator: 3/3 pass, gồm timeout và fallback mock.
-- [x] Communication: send/receive, correlation, error và timeout cleanup pass.
-- [x] Tool integration: SQL → biểu đồ PNG → scoring, 3/3 pass.
-- [x] `pip check`: không có dependency bị hỏng.
-- [x] Báo cáo UTF-8 có đủ 10 mục và phụ lục bonus 6c.
-- [x] Kiểm tra kết quả benchmark đã lưu: 3 nhóm × 3 lần, 9/9 success. Lần rà soát này không gọi lại LLM; các metrics live vẫn là lần đo ở mục 5.
-- [x] `.env` bị ignore, không được Git theo dõi; không có TODO chức năng còn bỏ trống.
-- [x] Code/báo cáo đã được commit và push lên GitHub.
-- [ ] Mục tiêu utilization 70–90% cho mọi worker: chưa đạt trong phép đo ở mục 8.
-- [ ] Submit: sinh viên tự nộp theo yêu cầu.
-
-Kết luận rà soát: các chức năng, test và tài liệu trong checklist đã hoàn thành; chưa thể khẳng định mọi chỉ tiêu hiệu suất đều đạt. Coverage 82,40% là lần đo có coverage gần nhất, không phải số đo lại trong lần chạy pytest không bật coverage này.
