@@ -211,7 +211,7 @@ Scale ngang cần broker ngoài process, worker replicas, persistent task state 
 - [x] Phần 5: 23+ tests/all pass, coverage, benchmarks và phân tích.
 - [x] Phần 6: đủ 10 mục báo cáo theo yêu cầu mới nhất.
 - [ ] Bonus 6a–6e: tùy chọn, chưa thực hiện.
-- [ ] Push GitHub: xác nhận sau khi push thành công.
+- [x] Push GitHub: đã push branch main tới origin; bản báo cáo hoàn thiện ở commit 7b42dc1.
 - [ ] Submit: sinh viên sẽ tự nộp sau.
 
 Test/performance ở mục 4–5 theo Phần 6; mục 6 là resilience. Lịch sử debug/profiling ở report/INTEGRATION.md. Không dùng số liệu ví dụ của đề bài làm kết quả đo.
