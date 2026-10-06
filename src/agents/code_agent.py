@@ -19,6 +19,7 @@ class CodeAgent(BaseWorker):
         " For charts, read the source CSV to obtain individual rows and execute matplotlib savefig. "
         "PNG files must be produced by matplotlib, never by create_file or write_file. "
         "After successful savefig, return the path immediately; do not recreate or overwrite the image."
+        " When asked to create and test a Python script, use write_and_run_script in one call."
     )
 
     def __init__(self, model=None, *, workspace="."):
@@ -28,6 +29,7 @@ class CodeAgent(BaseWorker):
                     "edit_file": self.edit_file, "execute_python": self.execute_python,
                     "run_script": self.run_script, "python_repl": self.python_repl,
                     "create_file": self.create_file}
+        tool_map["write_and_run_script"] = self.write_and_run_script
         super().__init__("code_agent", model, make_tools(tool_map), result_type="code",
                          system_prompt=self.SYSTEM_PROMPT, tool_map=tool_map, workspace=workspace)
 
@@ -48,6 +50,12 @@ class CodeAgent(BaseWorker):
         if target.suffix != ".py":
             raise ValueError("Only .py scripts are supported")
         return await self.execute_python(target.read_text(encoding="utf-8"), timeout)
+
+    async def write_and_run_script(self, path: str, code: str, timeout: float = 10) -> dict:
+        """Create a Python script and test it; return file path and actual execution output."""
+        written = self.write_file(path, code)
+        execution = await self.run_script(path, timeout)
+        return {**written, **execution, "tested": True}
 
     @staticmethod
     def validate_python(code):

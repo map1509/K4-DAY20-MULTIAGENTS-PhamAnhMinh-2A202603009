@@ -9,6 +9,8 @@ import pytest
 from agents import DataAgent, CodeAgent, EvaluatorAgent
 from coordinator import Coordinator
 from system import MultiAgentSystem
+from langchain_core.messages import AIMessage
+from lab.testing import ScriptedChatModel
 
 
 class RoutingModel:
@@ -25,6 +27,64 @@ class RoutingModel:
                     "plt.bar(data['month'], data['revenue'])\nplt.title('Q3 revenue')\n"
                     "plt.savefig('chart.png')\nplt.close()\nprint('chart.png created')")}}
         return SimpleNamespace(content=json.dumps({"task_type": kind, "parameters": parameters, "priority": "normal"}))
+
+
+def test_script_is_written_and_executed_in_one_model_call(tmp_path):
+    model = ScriptedChatModel(script=[AIMessage(content="", tool_calls=[{
+        "name": "write_and_run_script", "args": {"path": "answer.py", "code": "print(500)"}, "id": "write-test"}])])
+    worker = CodeAgent(model, workspace=tmp_path)
+    result = asyncio.run(worker.process_async("Write Python script answer.py and test it"))
+    assert result["status"] == "success"
+    assert result["content"]["tested"] and result["content"]["stdout"].strip() == "500"
+    assert (tmp_path / "answer.py").read_text() == "print(500)"
+    assert model.calls == 1
+
+
+def test_explicit_routing_keeps_model_for_offline_worker_parameters(tmp_path):
+    class NoCalls:
+        def invoke(self, prompt):
+            raise AssertionError("Unnecessary coordinator model call")
+    model = NoCalls()
+    workers = [DataAgent(model, workspace=tmp_path), CodeAgent(model, workspace=tmp_path)]
+    coord = Coordinator(model, workers)
+    assert coord.parse_request("Analyze sales AND create chart")['task_type'] == "complex"
+    assert coord.parse_request("Write Python script to read CSV")['task_type'] == "code_generation"
+    offline = Coordinator(RoutingModel(), [DataAgent(workspace=tmp_path), CodeAgent(workspace=tmp_path)])
+    assert offline.parse_request("Calculate revenue and create chart")["parameters"]["data_agent"]["operation"] == "analyze_csv"
+
+
+def test_logging_redacts_nested_secrets_and_reconfiguration(tmp_path, monkeypatch):
+    import logging
+    from logging_config import configure_logging, refresh_redaction
+    secret = "synthetic-private-value-for-test"
+    monkeypatch.setenv("LAB_API_KEY", secret)
+    names = ("coordinator", "communication", "data_agent", "code_agent", "evaluator_agent", "system",
+             "query_database", "python_repl", "create_file", "score_result")
+    previous = {name: (list(logging.getLogger(name).handlers), logging.getLogger(name).level,
+                       logging.getLogger(name).propagate) for name in names}
+    try:
+        configure_logging(tmp_path / "first")
+        configure_logging(tmp_path / "second")
+        logging.getLogger("coordinator").error("Worker error %s", secret)
+        logging.getLogger("communication").info(json.dumps({"message": {
+            "api_key": secret, "nested": [secret, {"text": "sk-synthetic-key", "count": 3}]}}))
+        text = (tmp_path / "second/coordinator.log").read_text(encoding="utf-8")
+        envelope = (tmp_path / "second/communication.log").read_text(encoding="utf-8")
+        assert secret not in text + envelope and "sk-synthetic-key" not in envelope
+        assert json.loads(envelope)["message"]["nested"][1]["count"] == 3
+        assert len([h for h in logging.getLogger("communication").handlers if getattr(h, "multi_agent_debug", False)]) == 1
+    finally:
+        for name, (handlers, level, propagate) in previous.items():
+            logger = logging.getLogger(name)
+            for handler in list(logger.handlers):
+                if handler not in handlers:
+                    logger.removeHandler(handler)
+                    handler.close()
+            logger.handlers = handlers
+            logger.setLevel(level)
+            logger.propagate = propagate
+        monkeypatch.undo()
+        refresh_redaction()
 
 
 @pytest.fixture

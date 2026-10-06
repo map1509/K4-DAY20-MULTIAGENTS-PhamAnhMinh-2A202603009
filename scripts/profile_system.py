@@ -22,14 +22,20 @@ class TimedWorker:
         self.name = worker.name
         self.busy_seconds = 0
         self.calls = 0
+        self.active = 0
+        self.active_since = None
 
     async def process_async(self, *args, **kwargs):
-        start = perf_counter()
+        if self.active == 0:
+            self.active_since = perf_counter()
+        self.active += 1
         self.calls += 1
         try:
             return await self.worker.process_async(*args, **kwargs)
         finally:
-            self.busy_seconds += perf_counter() - start
+            self.active -= 1
+            if self.active == 0:
+                self.busy_seconds += perf_counter() - self.active_since
 
 
 def percentile(values, percent):
@@ -59,7 +65,7 @@ async def run_system(args, output_dir):
     latencies, records = [], []
     started = perf_counter()
     try:
-        for index in range(args.requests):
+        async def process_one(index):
             if args.live:
                 request = (
                     f"Test request {index}: Analyze Q3 total revenue in sales.csv (columns month,revenue). "
@@ -84,6 +90,11 @@ async def run_system(args, output_dir):
             record["latency_seconds"] = latency
             records.append(record)
             print(f"Request {index + 1}/{args.requests}: status={status} latency={latency:.3f}s", flush=True)
+        semaphore = asyncio.Semaphore(args.concurrency)
+        async def bounded(index):
+            async with semaphore:
+                await process_one(index)
+        await asyncio.gather(*(bounded(index) for index in range(args.requests)))
         duration = perf_counter() - started
         totals = {field: sum(entry.get(field, 0) for entry in usage.usage_metadata.values())
                   for field in ("input_tokens", "output_tokens", "total_tokens")}
@@ -94,6 +105,7 @@ async def run_system(args, output_dir):
                                     "percent": worker.busy_seconds / duration * 100} for worker in workers}
         estimated_tokens = totals["total_tokens"] / args.requests * 100
         return {"mode": "live" if args.live else "local_no_model", "requests": args.requests,
+                "concurrency": args.concurrency,
                 "wall_seconds": duration, "latency_p50_seconds": p50, "latency_p99_seconds": p99,
                 "throughput_requests_per_minute": throughput, "worker_utilization": utilization,
                 "successful_throughput_requests_per_minute": (args.requests - errors) * 60 / duration,
@@ -105,9 +117,9 @@ async def run_system(args, output_dir):
                             "error_rate_below_1_percent": errors / args.requests < .01,
                             "tokens_at_most_150k_per_100": estimated_tokens <= 150000 if args.live else None},
                 "records": records,
-                "notes": ["Five default sequential samples; P99 is an interpolated estimate, not a reliable tail latency.",
+                "notes": ["P99 is an interpolated sample estimate, not a reliable tail latency.",
                           "Latency includes failed requests; throughput counts completed attempts, not only successes.",
-                          "Worker utilization measures awaited processing time, including I/O/model waits; not CPU utilization.",
+                          "Worker utilization is wall time with at least one active call (union of intervals); includes I/O/model waits, not CPU usage or capacity utilization.",
                           "cProfile covers the main event-loop thread; worker threads and REPL child processes are excluded.",
                           "Local mode has no model calls; do not compare its speed/token usage to LLM performance."]}
     finally:
@@ -119,11 +131,12 @@ async def run_system(args, output_dir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--requests", type=int, default=5)
+    parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument("--live", action="store_true", help="Use configured LLM for coordinator/workers; consumes tokens")
     args = parser.parse_args()
-    if args.requests < 1 or args.timeout <= 0:
-        parser.error("requests and timeout must be positive")
+    if args.requests < 1 or args.timeout <= 0 or args.concurrency < 1:
+        parser.error("requests, concurrency and timeout must be positive")
     directory = Path("results/profiling") / str(uuid.uuid4())
     directory.mkdir(parents=True)
     configure_logging(directory / "logs")

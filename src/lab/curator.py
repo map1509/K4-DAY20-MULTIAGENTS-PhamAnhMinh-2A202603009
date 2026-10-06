@@ -6,6 +6,9 @@ Chạy thật:   python -m lab.curator
 """
 import re
 from pathlib import Path
+import json
+from .tasks import ROOT
+from .model import make_model
 
 from .tasks import eval_markers   # có sẵn: định danh của tác vụ đánh giá, tính lúc chạy
 
@@ -68,7 +71,38 @@ def curate_skills(results_dir="results", source_condition="baseline", out_dir=No
     model mặc định: make_model() (lab.model).
     Trả về: danh sách đường dẫn SKILL.md đã ghi.
     """
-    raise NotImplementedError("TODO: cài đặt curate_skills (xem guides/pseudocode/04_curator.md)")
+    if max_skills < 1:
+        return []
+    examples = []
+    for path in sorted((Path(results_dir) / source_condition).glob("*/run.json")):
+        run = json.loads(path.read_text(encoding="utf-8"))
+        if run.get("role") != "learn":
+            continue
+        failures = [check for check in run.get("checks", []) if not check.get("passed")]
+        if not failures:
+            continue
+        trace = path.parent / "trace.md"
+        examples.append({"task": run["task"], "failures": failures,
+                         "trace": trace.read_text(encoding="utf-8")[-6000:] if trace.exists() else ""})
+    if not examples:
+        print("No failed learning checks; curator skipped")
+        return []
+    prompt = ("Write reusable skills based only on these learning failures. Do not include evaluation material. "
+              "Use blocks === SKILL: <name> === followed by SKILL.md with YAML name and description, "
+              "a body of at most 80 lines, then === END ===.\n" + json.dumps(examples, ensure_ascii=False))
+    reply = (model if model is not None else make_model()).invoke(prompt)
+    destination, paths, names = Path(out_dir) if out_dir is not None else ROOT / "skills/auto", [], set()
+    for name, text in parse_skill_blocks(reply.content):
+        if name in names or validate_skill(text, expected_name=name):
+            continue
+        path = destination / name / "SKILL.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
+        names.add(name)
+        paths.append(path)
+        if len(paths) >= max_skills:
+            break
+    return paths
 
 
 if __name__ == "__main__":

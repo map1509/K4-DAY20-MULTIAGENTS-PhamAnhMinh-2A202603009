@@ -51,54 +51,78 @@ Nhận xét: nhóm lỗi nào chiếm đa số? Skill có thể phòng ngừa nh
 
 ## 5. Test Results
 
-Kiểm tra ngày 06/10/2026 trên Windows, Python trong `.venv`.
+X?c nh?n sau s?a ng?y 06/10/2026 tr?n Windows, Python 3.11.9: **69/69 passed**, kh?ng skip test.
 
-| Nhóm test theo đề bài Coordinator/Workers/Tools | Kết quả |
+| Nh?m | K?t qu? |
 |---|---|
-| Coordinator (`test_02_coordinator.py`) | 14/14 passed |
-| Workers (`test_03_workers.py`) | 4/4 passed |
-| Tools (`test_04_tools.py`) | 4/4 passed |
-| Integration/E2E/performance (`test_05_integration.py`) | 5/5 passed |
-| Tổng các nhóm trên | 27/27 passed |
+| Coordinator | 14/14 |
+| Workers | 4/4 |
+| Tools | 4/4 |
+| Integration/E2E/performance v? regression | 8/8 |
+| BaseWorker | 7/7 |
+| Test repo g?c: provided/agent/runner/curator | 32/32 |
+| T?ng | 69/69 |
 
-Integration kiểm tra coordinator với workers, toàn bộ pipeline, latency và 10 yêu cầu đồng thời. Test sử dụng mock hoặc thao tác local, không dùng kết quả benchmark LLM thay cho unit test.
+?? c?i c?c TODO make_backend, build_agent, get_subagents, run_task v? curate_skills theo pseudo-code c?a repo. Backend Windows d?ng Git Bash c? s?n, m?i tr??ng ???c l?c v? Python t? venv; file tools v? shell d?ng chung sandbox root. Runner d?ng th? m?c t?m ngo?i repo, ghi trace/usage/?i?m, ph?t hi?n s?a skills v? d?n sandbox. Curator ch? ??c learning failures, lo?i skill kh?ng h?p l? ho?c ch?a evaluation markers. Kh?ng s?a h?ng prompt ho?c c?c module PROVIDED.
 
-Chạy toàn bộ: `.venv\Scripts\python.exe -m pytest tests/ -o addopts='-p no:cacheprovider' -q --tb=line` → **50 passed, 16 failed trong 31,41 giây**. Các lỗi còn lại thuộc lab Deep Agents gốc: 9 ở `test_02_agent.py`, 5 ở `test_03_runner.py`, 2 ở `test_04_curator.py`; nguyên nhân là các hàm TODO trong `src/lab/agent.py`, `subagents.py`, `runner.py`, `curator.py` ném `NotImplementedError`. Chưa đạt yêu cầu toàn bộ repo xanh; không bỏ qua hoặc sửa assertion để che lỗi. Chưa đo coverage nên chưa khẳng định đạt >80%.
+Regression ki?m tra t?o v? th?c thi script v?i m?t l??t model, ph?n lo?i nhanh v?n gi? tham s? cho workers offline, che secret trong JSON l?ng nhau v? thay handler khi c?u h?nh log l?i. Debug scripts: scripts/debug_agent.py, scripts/debug_system.py. L?nh x?c nh?n:
 
-Debug scripts: `scripts/debug_agent.py`, `scripts/debug_system.py`; profiling: `scripts/profile_system.py`. Communication được ghi JSONL, log riêng từng component. Chi tiết các lần debug/profiling ở `report/INTEGRATION.md`.
+```powershell
+.venv\Scripts\python.exe -m pytest tests/ -o addopts='-p no:cacheprovider' -q --tb=short --cov=src --cov-report=term-missing --cov-report=json:results/coverage.json
+```
+
+Coverage statement to?n b? src: **81.18%**, 1234/1520 statements (m?c ti?u >80%: ??t). Kh?ng lo?i module kh?i s? ?o; ti?n tr?nh REPL con hi?n ch?a ???c instrument, n?n _repl_worker.py v?n 0% trong b?o c?o n?y. ??y l? coverage d?ng, kh?ng ph?i b?ng ch?ng ki?m tra h?t m?i nh?nh. Th?i gian suite c? coverage: 54,66 gi?y.
 
 ## 6. Performance Analysis
 
 ### Benchmark Results
 
-Chạy `.venv\Scripts\python.exe scripts/benchmark.py`, gọi mô hình thật theo `.env`, 3 loại yêu cầu × 3 lần, tuần tự. CSV mẫu có doanh thu 100 + 150 + 250 = 500. Kết quả cuối ở `benchmark_results.json`; metrics và logs ở `results/benchmark/5781f06a-3f79-4f4c-a7e6-ee1093bdbea9/`.
+Suite gi? 3 lo?i t?c v? ? 3 l?n tu?n t?, m? h?nh th?t t? .env, c?ng d? li?u doanh thu 100 + 150 + 250 = 500. Kh?ng ??a API key v?o b?o c?o. K?t qu?: benchmark_results.json; metrics/logs/artifacts: results/benchmark/ba372709-4f7d-483e-8ef2-140ec36541ef/.
 
-| Test Case | Min | Max | Avg | Median | Thành công |
+| Test Case | Min | Max | Avg | Median | Th?nh c?ng |
 |---|---|---|---|---|---|
-| Simple data query | 2,058s | 2,648s | 2,275s | 2,119s | 3/3 |
-| Code generation | 7,369s | 9,316s | 8,419s | 8,571s | 3/3 |
-| Complex workflow | 5,862s | 10,381s | 7,643s | 6,688s | 3/3 |
+| Simple data query | 0.901s | 2.061s | 1.327s | 1.019s | 3/3 |
+| Code generation | 5.875s | 6.483s | 6.095s | 5.928s | 3/3 |
+| Complex workflow | 3.129s | 6.794s | 4.450s | 3.429s | 3/3 |
 
 ### Performance Metrics
 
-| Metric | Đo được | Target | Đánh giá trong mẫu |
-|---|---|---|---|
-| Latency P50 | 6,688s | <5s | Chưa đạt |
-| Latency P99 (nội suy) | 10,295s | <15s | Đạt |
-| Successful throughput | 9,816 req/min | >10 req/min | Chưa đạt |
-| Error rate | 0% (9/9) | <1% | Không lỗi trong mẫu |
-| Token usage | 17.021 (15.003 input + 2.018 output) | Theo dõi | Usage metadata API |
-| Token/100 requests dự phóng | 189.122 | ≤150.000 | Chưa đạt |
-| Worker utilization | Chưa đo trong benchmark này | 70–90% | Chưa kết luận |
+| Metric | Tr??c t?i ?u | Sau t?i ?u | Target | K?t qu? trong m?u |
+|---|---|---|---|---|
+| P50 | 6,688s | 3.429s | <5s | ??t |
+| P99 n?i suy | 10,295s | 6.769s | <15s | ??t |
+| Successful throughput | 9,816/ph?t | 15.159/ph?t | >10/ph?t | ??t |
+| Error rate | 0% (9/9) | 0% (9/9) | <1% | Kh?ng l?i trong m?u |
+| Token usage | 17.021 | 4,147 | Theo d?i | Gi?m kho?ng 75,6% |
+| Token/100 requests d? ph?ng | 189.122 | 46,078 | ?150.000 | ??t d? ph?ng |
 
-P50/P99 gộp 9 latencies. Throughput tính theo thời gian thực chạy cả suite tuần tự. Chín mẫu không đủ xác nhận P99/error rate dài hạn; token/100 chỉ là dự phóng, chưa chạy 100 requests. Profiling trước đó với workload tạo báo cáo khác đạt P50 4,127s, 13,154 req/min và dự phóng 117.580 token/100, nhưng không thay thế kết quả suite có tạo biểu đồ này. Utilization đo ở profile đó là Data 32,38%, Code 38,29%, Evaluator 0,022%; chưa đạt 70–90%, cần workload đồng thời đại diện và định nghĩa capacity rõ ràng.
+Usage sau s?a: 3156 input + 991 output. P50/P99 g?p 9 m?u, g?m cold start; throughput d?ng th?i gian th?c suite. Ch?a ch?y 100 y?u c?u, kh?ng kh?ng ??nh P99/error rate d?i h?n. Validator ki?m tra sum=500, script t?n t?i v? parse ???c, ?nh c? ch? k? PNG v? c? evaluation; ch?a ch?m ??y ?? n?i dung h?nh ho?c m?i t?nh ch?t script.
 
-### Findings
+### ?o t?i ??ng th?i v? utilization
 
-1. Lần benchmark đầu đạt 6/9, workflow phức hợp thất bại kiểm tra PNG dù pipeline báo success. Log cho thấy Code Agent gọi `create_file` sau `python_repl`, ghi đè biểu đồ bằng nội dung rỗng. Đã sửa prompt yêu cầu đọc CSV, lưu PNG bằng matplotlib và kết thúc sau `savefig`. Lần chạy lại đủ 9 yêu cầu đạt 9/9. Bằng chứng lần đầu: `results/benchmark/fad603a5-7c47-44fe-b238-51a6d32fc86a/` (33,33% lỗi, 16.093 tokens).
-2. Code generation chậm nhất, trung bình 8,419s, gồm tạo script và thực thi kiểm tra với nhiều lượt model/tool. Lần đầu của workflow biểu đồ mất 10,381s, các lần sau 6,688s và 5,862s, phù hợp chi phí khởi động/import và biến động API; chưa tách timing để quy toàn bộ chênh lệch cho REPL.
-3. Validator kiểm tra sum=500, script tồn tại và parse được bằng AST, PNG có chữ ký hợp lệ và có evaluation. Chưa chấm nội dung biểu đồ hoặc tính đúng của mọi script; evaluator mặc định chỉ kiểm tra sự hiện diện kết quả, không đủ thay cho validation artifact.
-4. Hướng tối ưu tiếp theo: giảm lượt LLM không cần thiết sau tool thành công, cache quyết định routing cho yêu cầu tương đương, đo warm/cold riêng và workload đồng thời. Giữ timeout, kiểm tra output và log lỗi; không tăng utilization bằng tác vụ thừa.
+?? b? sung --concurrency v?o profile_system.py. Utilization l? ph?n th?i gian c? ?t nh?t m?t l?i g?i worker ?ang ho?t ??ng (h?p c?c kho?ng th?i gian), tr?nh c?ng ch?ng l?m t? l? v??t 100%; g?m ch? I/O/model, kh?ng ph?i CPU usage ho?c capacity utilization.
+
+```powershell
+.venv\Scripts\python.exe scripts/profile_system.py --live --requests 10 --concurrency 3
+```
+
+Workload t?o b?o c?o, kh?c workload benchmark bi?u ??: **10/10 success**, P50 2.550s, P99 2.917s, throughput 58.968/ph?t, 6561 tokens/10 requests, d? ph?ng 65,610/100. Artifacts: results/profiling/d0bfca29-926b-4f8d-b991-4b4dc80549d0/.
+
+| Worker | Utilization |
+|---|---|
+| data_agent | 47.031% |
+| code_agent | 62.345% |
+| evaluator_agent | 0.102% |
+
+**M?c ti?u 70?90% cho m?i worker v?n ch?a ??t.** Evaluator l?m ki?m tra deterministic r?t ng?n; Data ch?y nhanh h?n Code v? Code ch? d? li?u upstream. T?ng concurrency ri?ng kh?ng c?n b?ng th?i l??ng c?c giai ?o?n. Sau t?i ?u, throughput t?t h?n nh?ng utilization c? th? gi?m v? b?t c?ng vi?c th?a. Kh?ng th?m sleep, g?i LLM kh?ng c?n thi?t hay s?a c?ng th?c ?? l?m ??p s?. Mu?n ?p d?ng m?c ti?u n?y c?n ??nh ngh?a n?ng l?c ph?c v? t?ng worker v? workload ??i di?n cho t?ng chuy?n m?n; kh?ng th? ??m b?o b?ng m?t c?u h?nh t?i chung c?a pipeline hi?n t?i.
+
+### Findings v? thay ??i
+
+1. Gi?m l??t LLM: coordinator ph?n lo?i b?ng quy t?c ch? cho y?u c?u t??ng minh v? workers c? model; tr??ng h?p m? h?/offline v?n l?y k? ho?ch model. Kh?ng b? validation input.
+2. Ch? c?p tools ph? h?p task: CSV t??ng minh d?ng analyze_csv, y?u c?u script d?ng write_and_run_script, chart d?ng python_repl, b?o c?o v?n b?n d?ng create_file. Gi?m k?ch th??c schema/prompt.
+3. G?p t?o v? ch?y script trong m?t tool, tr? stdout v? ???ng d?n th?t. Worker k?t th?c sau tool th?nh c?ng; v?i chart ch? k?t th?c khi PNG y?u c?u th?c s? t?n t?i v? c? ch? k? h?p l?.
+4. S?a 16 l?i TODO c?a repo g?c v? regression c?a worker offline; to?n b? test xanh. C?c m?c hi?u su?t ??t trong m?u cu?i, utilization v?n l? gi?i h?n ???c ghi r?.
+5. L?n l?i ban ??u 6/9 ???c gi? ? results/benchmark/fad603a5-7c47-44fe-b238-51a6d32fc86a/: Code Agent ghi ?? PNG b?ng file v?n b?n r?ng. ?? s?a prompt v? ch?n tool kh?ng ph? h?p cho y?u c?u chart. L?n tr??c t?i ?u 9/9 c? P50 6,688s ? results/benchmark/5781f06a-3f79-4f4c-a7e6-ee1093bdbea9/. C?c l?n th? trung gian v?n gi? local, kh?ng lo?i m?u l?i kh?i th?ng k? c?a t?ng l?n ch?y.
 
 ## 7. Kết quả so sánh (Phần 4.3, 4.4)
 

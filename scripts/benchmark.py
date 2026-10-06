@@ -73,7 +73,7 @@ async def main(args):
     def code(index):
         if not args.offline:
             return (f"Write Python script to read CSV sales.csv with pandas and print total revenue. "
-                    f"Create read_csv-{index}.py. Use write_file then run_script to test it. Return the script path and console output.")
+                    f"Create read_csv-{index}.py and test it. Return the script path and console output.")
         return {"task_type": "code_generation", "parameters": {"operation": "create_file", "filename": f"read_csv-{index}.py",
                 "content": "import pandas as pd\ndata = pd.read_csv('sales.csv')\nprint(data['revenue'].sum())\n"}}
 

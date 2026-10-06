@@ -1,0 +1,17 @@
+{
+  "mode": "live",
+  "requests": 9,
+  "successes": 9,
+  "p50_seconds": 3.4287377998698503,
+  "p99_seconds": 6.768986447853967,
+  "throughput_attempts_per_minute": 15.159466683143155,
+  "throughput_successes_per_minute": 15.159466683143155,
+  "error_rate_percent": 0.0,
+  "token_usage": {
+    "input_tokens": 3156,
+    "output_tokens": 991,
+    "total_tokens": 4147
+  },
+  "tokens_per_100_projected": 46077.777777777774,
+  "note": "Nine default samples, including failures; code validator checks file/syntax, not arbitrary code correctness."
+}

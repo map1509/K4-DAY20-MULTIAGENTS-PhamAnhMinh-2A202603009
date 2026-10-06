@@ -82,3 +82,9 @@ Lần đo live đầu sau sửa: 5/5 success, P50 5,58 giây, P99 5,79 giây, 11
 | Utilization Data/Code/Evaluator | 84,40% / 0% / 0% | 32,38% / 38,29% / 0,022% | chưa đạt 70–90% |
 
 Đã đối chiếu log kết quả DataAgent (sum=500) và CodeAgent tạo báo cáo từ upstream_data. Các workers đều được gọi, evaluator kiểm tra trực tiếp sự hiện diện đầu ra. Chưa chạy 100 request; không khẳng định tỷ lệ lỗi <1% hay P99 dài hạn. Utilization theo thời gian awaited xử lý ở workload tuần tự có dependency không thể xem như CPU usage. Evaluator nhanh và các worker chờ upstream làm tỷ lệ thấp; không tạo công việc thừa để nâng tỷ lệ. Muốn đánh giá mức sử dụng tài nguyên cần workload đồng thời đại diện và định nghĩa capacity/CPU utilization riêng.
+
+## Xác nhận cuối sau tối ưu (06/10/2026)
+
+Các số liệu ở trên là lịch sử các lần đo. Kết quả mới nhất được cập nhật ở REPORT.md mục 5–6: toàn bộ 69/69 tests pass, coverage src 81,18%. Benchmark cuối 9/9 thành công, P50 3,429s, P99 6,769s, throughput 15,159/phút, 4.147 tokens (dự phóng 46.078/100 requests). Artifacts: results/benchmark/ba372709-4f7d-483e-8ef2-140ec36541ef/.
+
+Profile thêm tùy chọn --concurrency và đo hợp các khoảng thời gian hoạt động worker. Workload báo cáo 10 requests, concurrency=3: 10/10 success, P50 2,550s, P99 2,917s, 58,968/phút, 6.561 tokens. Utilization Data/Code/Evaluator 47,031% / 62,345% / 0,102%; mục tiêu 70–90% cho mọi worker chưa đạt và không được giả lập bằng sleep/công việc thừa. Artifacts: results/profiling/d0bfca29-926b-4f8d-b991-4b4dc80549d0/.

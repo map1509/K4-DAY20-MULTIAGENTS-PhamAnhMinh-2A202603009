@@ -2,10 +2,10 @@
   {
     "name": "Simple data query",
     "iterations": 3,
-    "min": 2.0581616000272334,
-    "max": 2.648019100073725,
-    "avg": 2.2750016333690533,
-    "median": 2.118824200006202,
+    "min": 0.9007425999734551,
+    "max": 2.060916499933228,
+    "avg": 1.326864366652444,
+    "median": 1.018934000050649,
     "success_count": 3,
     "runs": [
       {
@@ -14,7 +14,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 2.648019100073725
+        "latency_seconds": 2.060916499933228
       },
       {
         "iteration": 2,
@@ -22,7 +22,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 2.118824200006202
+        "latency_seconds": 1.018934000050649
       },
       {
         "iteration": 3,
@@ -30,17 +30,17 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 2.0581616000272334
+        "latency_seconds": 0.9007425999734551
       }
     ]
   },
   {
     "name": "Code generation",
     "iterations": 3,
-    "min": 7.369116000132635,
-    "max": 9.316028299974278,
-    "avg": 8.418749966658652,
-    "median": 8.571105599869043,
+    "min": 5.875427599996328,
+    "max": 6.482611699961126,
+    "avg": 6.095184433351581,
+    "median": 5.92751400009729,
     "success_count": 3,
     "runs": [
       {
@@ -49,7 +49,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 7.369116000132635
+        "latency_seconds": 5.92751400009729
       },
       {
         "iteration": 2,
@@ -57,7 +57,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 8.571105599869043
+        "latency_seconds": 5.875427599996328
       },
       {
         "iteration": 3,
@@ -65,17 +65,17 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 9.316028299974278
+        "latency_seconds": 6.482611699961126
       }
     ]
   },
   {
     "name": "Complex workflow",
     "iterations": 3,
-    "min": 5.861900700023398,
-    "max": 10.38050219998695,
-    "avg": 7.643360166732843,
-    "median": 6.687677600188181,
+    "min": 3.1286094000097364,
+    "max": 6.793888599844649,
+    "avg": 4.450411933241412,
+    "median": 3.4287377998698503,
     "success_count": 3,
     "runs": [
       {
@@ -84,7 +84,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 10.38050219998695
+        "latency_seconds": 6.793888599844649
       },
       {
         "iteration": 2,
@@ -92,7 +92,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 6.687677600188181
+        "latency_seconds": 3.4287377998698503
       },
       {
         "iteration": 3,
@@ -100,7 +100,7 @@
         "pipeline_status": "success",
         "output_validation": true,
         "errors": [],
-        "latency_seconds": 5.861900700023398
+        "latency_seconds": 3.1286094000097364
       }
     ]
   }

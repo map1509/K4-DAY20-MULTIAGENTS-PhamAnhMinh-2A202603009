@@ -63,6 +63,17 @@ class Coordinator:
             except json.JSONDecodeError:
                 if self.model is None:
                     raise CoordinatorException("Free text requires a model; use structured input offline")
+                # Only bypass the model for explicit, unambiguous requests.
+                analysis = bool(re.search(r"\b(analyze|analyse|total revenue|calculate revenue)\b", user_input, re.I))
+                chart = bool(re.search(r"\b(create|generate) (?:a )?(chart|visualization|report)\b", user_input, re.I))
+                script = bool(re.search(r"\b(write|create) (?:a )?python script\b", user_input, re.I))
+                if script or (analysis and (chart or "analyze_csv" in user_input.lower())):
+                    combined = script and bool(re.search(r"\banaly[sz]e\b.*\band\b", user_input, re.I))
+                    kind = "complex" if combined or (analysis and chart) else "code_generation" if script else "data_analysis"
+                    names = self.ROUTES[kind]
+                    if all(getattr(getattr(self.workers.get(name), "worker", self.workers.get(name)), "model", None)
+                           is not None for name in names):
+                        return {"task_type": kind, "parameters": {}, "priority": "normal"}
                 prompt = (
                     "Classify the user request as data_analysis, code_generation, evaluation, or complex. "
                     "Use complex when analysis AND a report, chart, visualization, or code are requested. "

@@ -16,6 +16,9 @@ dependencies = [
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+[project.optional-dependencies]
+test = ["pytest-cov>=7.0"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

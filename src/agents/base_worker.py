@@ -2,6 +2,7 @@
 import asyncio
 import inspect
 import json
+import re
 from contextvars import ContextVar
 from collections.abc import Mapping
 from pathlib import Path
@@ -95,6 +96,14 @@ class BaseWorker(BaseAgent):
             offered_tools = list(self.tools.values())
             if self.name == "data_agent" and ".csv" in prompt.lower():
                 offered_tools = [tool for tool in offered_tools if tool.name not in ("query_sql", "query_database")]
+                if "analyze_csv" in prompt.lower() and not re.search(r"\b(group|join|validate)\b", prompt, re.I):
+                    offered_tools = [tool for tool in offered_tools if tool.name == "analyze_csv"]
+            if self.name == "code_agent" and re.search(r"\bwrite python script\b", prompt, re.I):
+                offered_tools = [tool for tool in offered_tools if tool.name == "write_and_run_script"]
+            elif self.name == "code_agent" and re.search(r"\bcreate chart\b", prompt, re.I):
+                offered_tools = [tool for tool in offered_tools if tool.name == "python_repl"]
+            elif self.name == "code_agent" and re.search(r"\breport-[\w-]+\.txt\b", prompt, re.I) and not re.search(r"\b(script|chart)\b", prompt, re.I):
+                offered_tools = [tool for tool in offered_tools if tool.name == "create_file"]
             if self.tools and callable(getattr(model, "bind_tools", None)):
                 model = model.bind_tools(offered_tools)
             completed = {}
@@ -135,7 +144,12 @@ class BaseWorker(BaseAgent):
                     if isinstance(result, Mapping) and result.get("status") == "error":
                         continue
                     # Atomic analysis/report/scoring operations already have verified structured output.
-                    terminal = {"analyze_csv", "pandas_analysis", "query_database", "query_sql", "create_file", "score", "score_result", "quality_check"}
+                    terminal = {"analyze_csv", "pandas_analysis", "query_database", "query_sql", "create_file", "score", "score_result", "quality_check", "write_and_run_script"}
+                    if call["name"] == "python_repl" and re.search(r"\bcreate chart\b", prompt, re.I):
+                        images = re.findall(r"\b([\w-]+\.png)\b", prompt)
+                        if images and all((self.workspace / name).is_file() and
+                                          (self.workspace / name).read_bytes().startswith(b"\x89PNG\r\n\x1a\n") for name in images):
+                            terminal.add("python_repl")
                     if len(normalized) == 1 and call["name"] in terminal:
                         return {"status": "success", "result": json.dumps(result, ensure_ascii=False, default=str),
                                 "type": self.result_type, "content": result,

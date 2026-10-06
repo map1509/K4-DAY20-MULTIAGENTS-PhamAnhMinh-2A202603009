@@ -1,0 +1,126 @@
+{
+  "mode": "live",
+  "requests": 10,
+  "concurrency": 3,
+  "wall_seconds": 10.1750131000299,
+  "latency_p50_seconds": 2.550146099878475,
+  "latency_p99_seconds": 2.9167625808599404,
+  "throughput_requests_per_minute": 58.96798304841856,
+  "worker_utilization": {
+    "data_agent": {
+      "calls": 10,
+      "busy_seconds": 4.785441200016066,
+      "percent": 47.0313025936252
+    },
+    "code_agent": {
+      "calls": 10,
+      "busy_seconds": 6.343612399883568,
+      "percent": 62.34500474367868
+    },
+    "evaluator_agent": {
+      "calls": 10,
+      "busy_seconds": 0.010359699837863445,
+      "percent": 0.10181510073763937
+    }
+  },
+  "successful_throughput_requests_per_minute": 58.96798304841856,
+  "error_rate_percent": 0.0,
+  "token_usage": {
+    "input_tokens": 5580,
+    "output_tokens": 981,
+    "total_tokens": 6561
+  },
+  "token_usage_by_model": {
+    "gpt-4o-mini-2024-07-18": {
+      "output_token_details": {
+        "audio": 0,
+        "reasoning": 0
+      },
+      "input_token_details": {
+        "audio": 0,
+        "cache_read": 0
+      },
+      "total_tokens": 6561,
+      "output_tokens": 981,
+      "input_tokens": 5580
+    }
+  },
+  "tokens_per_100_requests_projected": 65610.0,
+  "targets": {
+    "p50_below_5s": true,
+    "p99_below_15s": true,
+    "throughput_above_10_per_minute": true,
+    "worker_utilization_70_to_90_percent": false,
+    "error_rate_below_1_percent": true,
+    "tokens_at_most_150k_per_100": true
+  },
+  "records": [
+    {
+      "request": 1,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.784433899912983
+    },
+    {
+      "request": 2,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.795879000099376
+    },
+    {
+      "request": 0,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.92871809983626
+    },
+    {
+      "request": 3,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.4501387998461723
+    },
+    {
+      "request": 5,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.3370987998787314
+    },
+    {
+      "request": 4,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.650153399910778
+    },
+    {
+      "request": 7,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.2417076998390257
+    },
+    {
+      "request": 6,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.3799320000689477
+    },
+    {
+      "request": 8,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.3161190999671817
+    },
+    {
+      "request": 9,
+      "status": "success",
+      "errors": [],
+      "latency_seconds": 2.6664660999085754
+    }
+  ],
+  "notes": [
+    "P99 is an interpolated sample estimate, not a reliable tail latency.",
+    "Latency includes failed requests; throughput counts completed attempts, not only successes.",
+    "Worker utilization is wall time with at least one active call (union of intervals); includes I/O/model waits, not CPU usage or capacity utilization.",
+    "cProfile covers the main event-loop thread; worker threads and REPL child processes are excluded.",
+    "Local mode has no model calls; do not compare its speed/token usage to LLM performance."
+  ]
+}
