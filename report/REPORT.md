@@ -281,3 +281,19 @@ Utilization 70–90% của từng worker vẫn chưa đạt trong workload đã 
 | Submit | Nộp qua hệ thống của lớp | Chưa thực hiện; sinh viên tự nộp sau theo yêu cầu |
 
 Checklist trên xác nhận chức năng/tài liệu, không có nghĩa mọi performance target đều đạt. Utilization 70–90% vẫn chưa đạt như mục 7–8; không đánh dấu mục tiêu này là đạt.
+
+### Rà soát cuối từ đầu đến cuối (07/10/2026)
+
+- [x] Chạy lại toàn bộ `pytest tests/`: 74/74 pass, không skip.
+- [x] Standalone coordinator: 3/3 pass, gồm timeout và fallback mock.
+- [x] Communication: send/receive, correlation, error và timeout cleanup pass.
+- [x] Tool integration: SQL → biểu đồ PNG → scoring, 3/3 pass.
+- [x] `pip check`: không có dependency bị hỏng.
+- [x] Báo cáo UTF-8 có đủ 10 mục và phụ lục bonus 6c.
+- [x] Kiểm tra kết quả benchmark đã lưu: 3 nhóm × 3 lần, 9/9 success. Lần rà soát này không gọi lại LLM; các metrics live vẫn là lần đo ở mục 5.
+- [x] `.env` bị ignore, không được Git theo dõi; không có TODO chức năng còn bỏ trống.
+- [x] Code/báo cáo đã được commit và push lên GitHub.
+- [ ] Mục tiêu utilization 70–90% cho mọi worker: chưa đạt trong phép đo ở mục 8.
+- [ ] Submit: sinh viên tự nộp theo yêu cầu.
+
+Kết luận rà soát: các chức năng, test và tài liệu trong checklist đã hoàn thành; chưa thể khẳng định mọi chỉ tiêu hiệu suất đều đạt. Coverage 82,40% là lần đo có coverage gần nhất, không phải số đo lại trong lần chạy pytest không bật coverage này.
