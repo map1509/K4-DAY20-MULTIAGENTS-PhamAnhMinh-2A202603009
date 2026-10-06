@@ -11,6 +11,7 @@ import math
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from time import perf_counter
+from communication import MessageQueue
 
 
 class CoordinatorException(Exception):
@@ -41,7 +42,11 @@ class Coordinator:
             if not callable(getattr(worker, "process_async", None)):
                 raise ValueError(f"Worker {name} must expose process_async")
             self.workers[name] = worker
-        self.task_queue = message_queue if message_queue is not None else asyncio.Queue()
+        self.task_queue = message_queue if message_queue is not None else MessageQueue()
+        if isinstance(self.task_queue, MessageQueue):
+            self.task_queue.register_agent("coordinator")
+            for name in self.workers:
+                self.task_queue.register_agent(name)
         self.active_tasks = {}
         self.max_tasks = max_tasks
         self.logger = logging.getLogger("coordinator")
@@ -109,7 +114,7 @@ class Coordinator:
             copied.append(dict(task))
         return copied
 
-    async def aexecute_tasks(self, tasks, timeout=60):
+    async def aexecute_tasks(self, tasks, timeout=60, message_queue=None):
         """Run workers concurrently under one deadline, preserving partial results.
 
         Worker failures become per-task error records. Pending coroutines are
@@ -121,23 +126,59 @@ class Coordinator:
             raise CoordinatorException("Active task limit exceeded")
         if any(task["id"] in self.active_tasks for task in tasks):
             raise CoordinatorException("Task ID already active")
+        queue = message_queue if message_queue is not None else self.task_queue
+        if not isinstance(queue, MessageQueue):
+            raise CoordinatorException("message_queue must be a MessageQueue")
+        queue.register_agent("coordinator")
+        for task in tasks:
+            queue.register_agent(task["worker"])
+
+        async def worker_exchange(task, msg_id):
+            request = await queue.receive_message(task["worker"], timeout, message_id=msg_id)
+            try:
+                worker = self.workers[task["worker"]]
+                if "parameters" in task:
+                    pending = worker.process_async(request["content"], request["parameters"])
+                else:
+                    pending = worker.process_async(request["content"])
+                if not inspect.isawaitable(pending):
+                    raise WorkerError("process_async must return an awaitable")
+                value = await pending
+                response = {"type": "result", "task_id": task["id"], "in_reply_to": msg_id, "result": value}
+            except Exception as exc:
+                response = {"type": "result", "task_id": task["id"], "in_reply_to": msg_id,
+                            "result": {"status": "error", "error": f"{type(exc).__name__}: {exc}"}}
+            await queue.send_message(task["worker"], "coordinator", response)
 
         async def run(task):
             started = perf_counter()
             self.logger.info("Task %s worker=%s start", task["id"], task["worker"])
             record = {"id": task["id"], "worker": task["worker"]}
+            consumer = None
             try:
-                pending = self.workers[task["worker"]].process_async(task["content"])
-                if not inspect.isawaitable(pending):
-                    raise WorkerError("process_async must return an awaitable")
-                value = await pending
+                msg_id = await queue.send_message("coordinator", task["worker"], {
+                    "type": "task", "task_id": task["id"], "content": task["content"],
+                    "parameters": task.get("parameters", {})})
+                consumer = asyncio.create_task(worker_exchange(task, msg_id))
+                reply = await queue.receive_message("coordinator", timeout, in_reply_to=msg_id)
+                await consumer
+                value = reply["result"]
+                if isinstance(value, Mapping) and value.get("status") == "error":
+                    raise WorkerError(value.get("error", "Worker returned an error"))
                 if not isinstance(value, Mapping) or value.get("type") not in ("data", "code", "evaluation") or "content" not in value:
                     raise WorkerError("Worker result needs type (data/code/evaluation) and content")
                 record.update(status="success", result=dict(value))
+            except TimeoutError as exc:
+                record.update(status="timeout", error=str(exc))
+                self.logger.error("Task %s timeout: %s", task["id"], exc)
             except Exception as exc:
                 record.update(status="error", error=f"{type(exc).__name__}: {exc}")
                 self.logger.warning("Task %s failed: %s", task["id"], record["error"])
             finally:
+                if consumer is not None:
+                    if not consumer.done():
+                        consumer.cancel()
+                    await asyncio.gather(consumer, return_exceptions=True)
                 record["seconds"] = perf_counter() - started
                 self.logger.info("Task %s end duration=%.3fs status=%s", task["id"], record["seconds"], record.get("status", "cancelled"))
             return record
@@ -179,8 +220,8 @@ class Coordinator:
             return asyncio.run(factory())
         raise CoordinatorException("Use the async API inside an existing event loop")
 
-    def execute_tasks(self, tasks, timeout=60):
-        return self._sync(lambda: self.aexecute_tasks(tasks, timeout))
+    def execute_tasks(self, tasks, timeout=60, message_queue=None):
+        return self._sync(lambda: self.aexecute_tasks(tasks, timeout, message_queue))
 
     async def aexecute_tasks_with_retry(self, tasks, max_retries=2, timeout=60):
         """Retry only failed tasks; max_retries excludes the first attempt."""
