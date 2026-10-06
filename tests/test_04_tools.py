@@ -1,6 +1,19 @@
 from contextlib import closing
 import sqlite3
-from tools import QueryDatabaseTool, PythonREPLTool, CreateFileTool, ScoringTool
+from tools import QueryDatabaseTool, PythonREPLTool, CreateFileTool, EditFileTool, ScoringTool
+
+
+def test_edit_file_tool_in_worker(tmp_path):
+    from agents import CodeAgent
+    worker = CodeAgent(workspace=tmp_path)
+    worker.write_file("answer.py", "print(1)")
+    result = worker.tools["edit_file"].invoke({"path": "answer.py", "old": "1", "new": "2"})
+    assert result["written"] and (tmp_path / "answer.py").read_text() == "print(2)"
+    tool = EditFileTool(tmp_path)
+    assert tool.invoke({"filename": "answer.py", "old": "print(2)", "new": "broken("})["status"] == "error"
+    assert (tmp_path / "answer.py").read_text() == "print(2)"
+    assert tool.invoke({"filename": "../outside.txt", "old": "a", "new": "b"})["status"] == "error"
+    assert tool.invoke({"filename": "answer.py", "old": "absent", "new": "b"})["status"] == "error"
 
 
 def test_query_database_tool(tmp_path):

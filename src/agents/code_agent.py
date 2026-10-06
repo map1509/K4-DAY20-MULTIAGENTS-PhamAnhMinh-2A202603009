@@ -4,7 +4,7 @@ import asyncio
 import math
 import os
 import sys
-from tools import PythonREPLTool, CreateFileTool
+from tools import PythonREPLTool, CreateFileTool, EditFileTool
 
 from .base_worker import BaseWorker, make_tools
 
@@ -25,6 +25,7 @@ class CodeAgent(BaseWorker):
     def __init__(self, model=None, *, workspace="."):
         self.repl_tool = PythonREPLTool(base_path=workspace)
         self.create_file_tool = CreateFileTool(base_path=workspace)
+        self.edit_file_tool = EditFileTool(base_path=workspace)
         tool_map = {"validate_python": self.validate_python, "write_file": self.write_file,
                     "edit_file": self.edit_file, "execute_python": self.execute_python,
                     "run_script": self.run_script, "python_repl": self.python_repl,
@@ -75,13 +76,13 @@ class CodeAgent(BaseWorker):
         return {"path": str(target.relative_to(self.workspace)), "written": True}
 
     def edit_file(self, path, old, new):
-        if not isinstance(old, str) or not old or not isinstance(new, str):
-            raise ValueError("old must be nonempty and new must be a string")
         target = self.resolve_path(path)
-        code = target.read_text(encoding="utf-8")
-        if code.count(old) != 1:
-            raise ValueError("old text must match exactly once")
-        return self.write_file(path, code.replace(old, new, 1), overwrite=True)
+        if target.suffix != ".py":
+            raise ValueError("Only .py files are supported")
+        result = self.edit_file_tool.invoke({"filename": path, "old": old, "new": new})
+        if result["status"] == "error":
+            raise ValueError(result["error"])
+        return {"path": result["path"], "written": True}
 
     async def execute_python(self, code, timeout=10):
         """Run trusted Python in a child process, not a security sandbox."""

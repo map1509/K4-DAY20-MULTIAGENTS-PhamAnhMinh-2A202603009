@@ -88,7 +88,7 @@ Result có type=result, cùng task_id, in_reply_to=message-1 và trường resul
 | Queue | asyncio.Queue và correlation IDs | Không persistent/distributed |
 | Database | SQLite read-only, SELECT, parameters, connection cache/RLock | Query cùng connection tuần tự |
 | REPL | Subprocess giữ state, AST/import restrictions, resource limits | Không phải sandbox OS cho code đối kháng |
-| Code/file | Workspace-relative, AST; gộp tạo/chạy script | Chỉ chạy code tin cậy |
+| Code/file | CreateFileTool và EditFileTool riêng; workspace-relative, AST; gộp tạo/chạy script | Chỉ chạy code tin cậy |
 | Evaluation | Tools scoring/validation; mặc định kiểm tra output presence | Không chứng minh đúng nội dung |
 
 SQL lấy tối đa 1.000 rows, trả chi tiết 100 rows; progress handler giới hạn lượng công việc. REPL mặc định timeout 30s, memory limit 1.024 MiB, output 10.000 ký tự. close() giải phóng REPL/connection. Logging che secret.
@@ -97,18 +97,18 @@ Harness gốc dùng backend Windows với Git Bash có sẵn và environment đ�
 
 ## 4. Test results
 
-Sau bonus, kiểm tra ngày 07/10/2026: **73/73 passed**, không skip. Statement coverage toàn src: **81,94%**, 1.307/1.595 statements.
+Sau bonus và bổ sung EditFileTool, kiểm tra ngày 07/10/2026: **74/74 passed**, không skip. Statement coverage toàn src: **82,40%**, 1.339/1.625 statements.
 
 | Nhóm | Passed |
 |---|---|
 | Coordinator | 14/14 |
 | Workers | 4/4 |
-| Tools | 4/4 |
+| Tools | 5/5 |
 | BaseWorker | 7/7 |
 | Integration/E2E/performance/regression | 8/8 |
 | Provided/agent/runner/curator gốc | 32/32 |
 | Bonus caching | 4/4 |
-| Tổng | 73/73 |
+| Tổng | 74/74 |
 
 Integration kiểm tra coordinator-worker-tool, full pipeline, latency local và 10 yêu cầu đồng thời. Regression kiểm tra tạo/chạy script một lượt model, routing với offline workers và che secret trong log.
 
@@ -168,8 +168,8 @@ Queue không drop-oldest hoặc có test overflow giả định. Ứng dụng ch
 | Coordinator + 3 workers | Đủ bốn vai trò và tools riêng | Đạt |
 | Async communication | Mailboxes/correlation/gather/deadline | Một process |
 | Collaboration | Data → Code với upstream_data → Evaluator | Phần phụ thuộc tuần tự |
-| 23+ tests, all pass | 73/73 | Đạt |
-| Coverage >80% | 81,94% | Đạt statement coverage |
+| 23+ tests, all pass | 74/74 | Đạt |
+| Coverage >80% | 82,40% | Đạt statement coverage |
 | Latency/throughput/token | Mục 5 | Đạt trong mẫu |
 | Utilization mỗi worker 70–90% | Data 47,031%; Code 62,345%; Evaluator 0,102% | Chưa đạt |
 | Python sandbox | Subprocess/resource/AST limits | Chưa isolation OS |
@@ -195,7 +195,7 @@ Scale ngang cần broker ngoài process, worker replicas, persistent task state 
 
 ## 10. Kết luận & đề xuất tiếp theo
 
-Đã xây dựng Coordinator/Data/Code/Evaluator với tools và giao tiếp async, kiểm chứng 73/73 tests và coverage 81,94% sau bonus 6c. Benchmark LLM đạt 9/9 cùng mục tiêu P50/P99/throughput/token trong mẫu; caching local đạt 19 hit/1 miss cho 20 requests. Utilization 70–90% cho mọi worker chưa đạt do workload và thời lượng không cân bằng. Tiếp theo cần validation nội dung artifacts, tải dài hạn và queue/state có giới hạn. Triển khai ngoài lab cần isolation mạnh hơn, broker persistent và idempotency.
+Đã xây dựng Coordinator/Data/Code/Evaluator với tools và giao tiếp async, kiểm chứng 74/74 tests và coverage 82,40% sau bonus 6c và EditFileTool. Benchmark LLM đạt 9/9 cùng mục tiêu P50/P99/throughput/token trong mẫu; caching local đạt 19 hit/1 miss cho 20 requests. Utilization 70–90% cho mọi worker chưa đạt do workload và thời lượng không cân bằng. Tiếp theo cần validation nội dung artifacts, tải dài hạn và queue/state có giới hạn. Triển khai ngoài lab cần isolation mạnh hơn, broker persistent và idempotency.
 
 ## Phụ lục: checklist nộp bài
 
@@ -250,3 +250,34 @@ Benchmark chạy `scripts/benchmark_cache.py`, 20 yêu cầu/mode trên CSV 10.0
 Giảm khoảng 89,4% thời gian trong mẫu local. Không so throughput local này với benchmark LLM hoặc khẳng định token savings chưa đo. Metrics: `results/caching/8ea43209-9b5e-4215-8d5d-526cc9970127/metrics.json`. Tests: `tests/test_06_caching.py` kiểm tra copy isolation, file invalidation, TTL/LRU, error/write bypass và deadline/config validation.
 
 Utilization 70–90% của từng worker vẫn chưa đạt trong workload đã đo ở mục 8. Đây là mục tiêu phụ thuộc phân bố tải và định nghĩa capacity, không phải TODO chưa cài; caching giảm công việc worker nên cũng không bảo đảm nâng tỷ lệ này. Không thêm sleep hay công việc không cần thiết để làm đẹp số. Bước Submit vẫn do sinh viên tự thực hiện như đã yêu cầu.
+
+### Checklist Báo cáo Phần 6
+
+- [x] Mục 1: Tổng quan bài lab, scope và ba câu hỏi kiến trúc.
+- [x] Mục 2: Kiến trúc design, sơ đồ, mô tả và protocol.
+- [x] Mục 3: Implementation details, decisions và trade-offs.
+- [x] Mục 4: Test results, hơn 15 tests, toàn bộ pass và coverage.
+- [x] Mục 5: Performance analysis, latency, throughput và bottlenecks.
+- [x] Mục 6: Error analysis và resilience thực tế.
+- [x] Mục 7: Design vs Implementation comparison.
+- [x] Mục 8: Scalability analysis và tải đồng thời.
+- [x] Mục 9: Limitations và considerations.
+- [x] Mục 10: Conclusion và next steps.
+- [x] Bonus: chọn 6c, có implementation, tests, benchmark và phụ lục.
+- [x] Commit báo cáo: đã có commit `part 6: final report`; các cập nhật sau được commit riêng.
+
+### Checklist toàn bộ Lab Day 20
+
+| Phần | Hạng mục đã đối chiếu | Trạng thái |
+|---|---|---|
+| 0 | Fork/clone, venv/dependencies, .env/key, README/GUIDE | Hoàn thành; .env không commit |
+| 1 | Sơ đồ, agents/roles, protocol, ba câu hỏi mục 1 | Hoàn thành |
+| 2 | Parse/route/execute/aggregate, timeout/retry, mock coordinator tests | Hoàn thành |
+| 3 | BaseWorker, Data/Code/Evaluator, MessageQueue, coordinator-worker integration | Hoàn thành |
+| 4 | QueryDatabaseTool, PythonREPLTool, CreateFileTool, EditFileTool, ScoringTool, ValidationTool và integration | Hoàn thành; REPL có guardrails, không phải isolation OS |
+| 5 | 23+ tests/all pass, benchmark, bottlenecks và metrics | Hoàn thành; số liệu chi tiết tại mục 4–6 |
+| 6 | Đủ 10 mục, architecture/tests/performance/analysis và bonus 6c | Hoàn thành |
+| GitHub | Push các commit hoàn thiện lên origin/main | Đã push; cập nhật mới tiếp tục được push |
+| Submit | Nộp qua hệ thống của lớp | Chưa thực hiện; sinh viên tự nộp sau theo yêu cầu |
+
+Checklist trên xác nhận chức năng/tài liệu, không có nghĩa mọi performance target đều đạt. Utilization 70–90% vẫn chưa đạt như mục 7–8; không đánh dấu mục tiêu này là đạt.

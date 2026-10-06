@@ -142,3 +142,37 @@ class CreateFileTool(BaseTool):
             return {"status": "success", "path": str(path), "size": len(input_dict["content"])}
         except Exception as exc:
             return {"status": "error", "error": str(exc)}
+
+
+class EditFileTool(CreateFileTool):
+    """Replace one exact text occurrence inside the workspace."""
+    def __init__(self, base_path="./outputs"):
+        super().__init__(base_path)
+        self.name = "edit_file"
+        self.description = "Edit a UTF-8 workspace file using one exact old/new text replacement"
+
+    def validate_input(self, input_dict):
+        if not isinstance(input_dict, dict):
+            raise ValueError("input must be a dictionary")
+        self._path(input_dict.get("filename"))
+        if not isinstance(input_dict.get("old"), str) or not input_dict["old"]:
+            raise ValueError("old must be nonempty text")
+        if not isinstance(input_dict.get("new"), str):
+            raise ValueError("new must be text")
+        return True
+
+    def invoke(self, input_dict):
+        try:
+            self.validate_input(input_dict)
+            path = self._path(input_dict["filename"])
+            text = path.read_text(encoding="utf-8")
+            if text.count(input_dict["old"]) != 1:
+                raise ValueError("old text must match exactly once")
+            updated = text.replace(input_dict["old"], input_dict["new"], 1)
+            if path.suffix == ".py":
+                ast.parse(updated)
+            path.write_text(updated, encoding="utf-8")
+            logging.getLogger(self.name).info("Edited %s", path)
+            return {"status": "success", "path": str(path.relative_to(self.base_path)), "written": True}
+        except Exception as exc:
+            return {"status": "error", "error": str(exc)}
