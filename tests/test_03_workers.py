@@ -20,7 +20,7 @@ def test_data_agent_process(tmp_path):
             "path": "sales.csv", "column": "amount"}, "id": "sales"}]),
         AIMessage(content="Sales total: 5")])
     result = DataAgent(model, workspace=tmp_path).process("Analyze sales")
-    assert result["status"] == "success" and result["result"] == "Sales total: 5"
+    assert result["status"] == "success" and result["content"]["value"] == 5
     assert result["metadata"]["tool_names"] == ["analyze_csv"]
 
 

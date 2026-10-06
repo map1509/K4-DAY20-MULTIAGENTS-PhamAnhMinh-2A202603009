@@ -57,7 +57,11 @@ class BaseWorker(BaseAgent):
         return self._tool_history.get() or []
 
     def _build_prompt(self, task_content, parameters=None):
-        return (f"{self.system_prompt or ''}\n\nTask: {task_content}\n"
+        if isinstance(task_content, Mapping) and "request" in task_content:
+            parameters = parameters if parameters is not None else task_content.get("parameters", {})
+            upstream = task_content.get("upstream_data")
+            task_content = str(task_content["request"]) + (f"\nVerified upstream_data: {json.dumps(upstream, default=str)}" if upstream is not None else "")
+        return (f"Task: {task_content}\n"
                 f"Parameters: {json.dumps(parameters or {}, ensure_ascii=False, default=str)}\n"
                 f"Available tools: {list(self.tools)}")
 
@@ -88,9 +92,14 @@ class BaseWorker(BaseAgent):
             prompt = self._build_prompt(task_content, parameters)
             messages = [SystemMessage(content=self.system_prompt or ""), HumanMessage(content=prompt)]
             model = self.model
+            offered_tools = list(self.tools.values())
+            if self.name == "data_agent" and ".csv" in prompt.lower():
+                offered_tools = [tool for tool in offered_tools if tool.name not in ("query_sql", "query_database")]
             if self.tools and callable(getattr(model, "bind_tools", None)):
-                model = model.bind_tools(list(self.tools.values()))
+                model = model.bind_tools(offered_tools)
+            completed = {}
             for iteration in range(self.max_iterations + 1):
+                self.logger.debug("Model invocation iteration=%s", iteration)
                 response = model.invoke(messages)
                 calls = getattr(response, "tool_calls", None) or []
                 if not calls:
@@ -111,9 +120,26 @@ class BaseWorker(BaseAgent):
                                        "id": call.get("id") or f"call-{iteration}-{index}"})
                 messages.append(AIMessage(content=response.content or "", tool_calls=normalized))
                 for call in normalized:
+                    self.logger.debug("Tool call name=%s id=%s", call["name"], call["id"])
+                    signature = json.dumps([call["name"], call["args"]], sort_keys=True)
+                    if signature in completed:
+                        raise WorkerError("Repeated tool call without progress")
+                    if call["name"] not in self.tools:
+                        raise ValueError(f"Unknown tool: {call['name']}")
+                    if call["name"] not in {tool.name for tool in offered_tools}:
+                        raise WorkerError("Tool is not appropriate for this task's file type")
                     result = self._execute_tool(call["name"], call["args"])
+                    completed[signature] = result
                     messages.append(ToolMessage(content=json.dumps(result, ensure_ascii=False, default=str),
                                                 tool_call_id=call["id"], name=call["name"]))
+                    if isinstance(result, Mapping) and result.get("status") == "error":
+                        continue
+                    # Atomic analysis/report/scoring operations already have verified structured output.
+                    terminal = {"analyze_csv", "pandas_analysis", "query_database", "query_sql", "create_file", "score", "score_result", "quality_check"}
+                    if len(normalized) == 1 and call["name"] in terminal:
+                        return {"status": "success", "result": json.dumps(result, ensure_ascii=False, default=str),
+                                "type": self.result_type, "content": result,
+                                "metadata": {"tools_used": len(self._executed_tools), "tool_names": list(self._executed_tools)}}
             raise WorkerError("Agentic loop iteration limit exceeded")
         except Exception as exc:
             self.logger.error("Worker %s failed: %s", self.name, exc)
@@ -142,7 +168,10 @@ class BaseWorker(BaseAgent):
         thread already running; Python execution uses a cancellable subprocess.
         No model is called by this deterministic offline worker implementation.
         """
-        if self.model is not None:
+        planned = content.get("parameters", content) if isinstance(content, Mapping) else None
+        explicit_operation = (isinstance(planned, Mapping) and isinstance(planned.get("operation"), str)
+                              and planned["operation"] in self.tool_map)
+        if self.model is not None and not explicit_operation:
             return await asyncio.to_thread(self.process, content, parameters)
         if parameters is not None:
             content = {"request": content, "parameters": parameters}

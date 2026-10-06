@@ -12,6 +12,9 @@ class DataAgent(BaseWorker):
     SYSTEM_PROMPT = (
         "Analyze data using the supplied tools. Validate numeric values and column names. "
         "Do not invent missing values or modify databases. Report row counts and calculations."
+        " CSV files are NOT SQL databases. For a CSV total use analyze_csv(path, column, aggregation='sum'); "
+        "for grouping use pandas_analysis. Only use query_sql/query_database with a SQLite database. "
+        "After a successful calculation, return its result; do not repeat the same operation."
     )
 
     def __init__(self, model=None, db_connection=None, *, workspace="."):

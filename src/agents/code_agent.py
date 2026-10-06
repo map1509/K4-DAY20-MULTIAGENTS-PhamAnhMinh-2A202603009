@@ -14,6 +14,11 @@ class CodeAgent(BaseWorker):
         "Work on Python code within the workspace. Check syntax before writing. "
         "Run only explicitly requested trusted code. ALWAYS test code before returning. "
         "Report actual files and execution results."
+        " If upstream_data is provided, use that verified data; do not redo analysis. "
+        "For a plain text report, use create_file(filename, content), then finish."
+        " For charts, read the source CSV to obtain individual rows and execute matplotlib savefig. "
+        "PNG files must be produced by matplotlib, never by create_file or write_file. "
+        "After successful savefig, return the path immediately; do not recreate or overwrite the image."
     )
 
     def __init__(self, model=None, *, workspace="."):

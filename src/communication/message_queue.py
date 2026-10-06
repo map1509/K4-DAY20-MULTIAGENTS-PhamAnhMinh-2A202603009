@@ -3,6 +3,7 @@ import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+import logging
 import uuid
 
 
@@ -12,6 +13,7 @@ class MessageQueue:
         self.message_log = []
         self._conditions = {}
         self._loop = None
+        self.logger = logging.getLogger("communication")
 
     def register_agent(self, agent_name):
         if not isinstance(agent_name, str) or not agent_name:
@@ -41,6 +43,7 @@ class MessageQueue:
             self.message_log.append(deepcopy(envelope))
             await self.queues[to_agent].put(envelope)
             condition.notify_all()
+            self.logger.info(json.dumps({"event": "send", "message": envelope}, ensure_ascii=False))
         return envelope["id"]
 
     async def receive_message(self, agent_name, timeout=30, *, in_reply_to=None, message_id=None):
@@ -64,11 +67,14 @@ class MessageQueue:
                     for message in retained:
                         mailbox.put_nowait(message)
                     if selected is not None:
+                        self.logger.info(json.dumps({"event": "receive", "message": selected}, ensure_ascii=False))
                         return selected
                     await condition.wait()
         try:
             return await asyncio.wait_for(receive(), timeout=timeout)
         except asyncio.TimeoutError as exc:
+            self.logger.info(json.dumps({"event": "timeout", "agent": agent_name, "timeout": timeout,
+                                         "in_reply_to": in_reply_to, "message_id": message_id}))
             raise TimeoutError(f"No message for {agent_name} within {timeout}s") from exc
 
     def get_message_log(self, agent_name=None):

@@ -1,0 +1,107 @@
+[
+  {
+    "name": "Simple data query",
+    "iterations": 3,
+    "min": 2.0581616000272334,
+    "max": 2.648019100073725,
+    "avg": 2.2750016333690533,
+    "median": 2.118824200006202,
+    "success_count": 3,
+    "runs": [
+      {
+        "iteration": 1,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 2.648019100073725
+      },
+      {
+        "iteration": 2,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 2.118824200006202
+      },
+      {
+        "iteration": 3,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 2.0581616000272334
+      }
+    ]
+  },
+  {
+    "name": "Code generation",
+    "iterations": 3,
+    "min": 7.369116000132635,
+    "max": 9.316028299974278,
+    "avg": 8.418749966658652,
+    "median": 8.571105599869043,
+    "success_count": 3,
+    "runs": [
+      {
+        "iteration": 1,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 7.369116000132635
+      },
+      {
+        "iteration": 2,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 8.571105599869043
+      },
+      {
+        "iteration": 3,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 9.316028299974278
+      }
+    ]
+  },
+  {
+    "name": "Complex workflow",
+    "iterations": 3,
+    "min": 5.861900700023398,
+    "max": 10.38050219998695,
+    "avg": 7.643360166732843,
+    "median": 6.687677600188181,
+    "success_count": 3,
+    "runs": [
+      {
+        "iteration": 1,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 10.38050219998695
+      },
+      {
+        "iteration": 2,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 6.687677600188181
+      },
+      {
+        "iteration": 3,
+        "status": "success",
+        "pipeline_status": "success",
+        "output_validation": true,
+        "errors": [],
+        "latency_seconds": 5.861900700023398
+      }
+    ]
+  }
+]
