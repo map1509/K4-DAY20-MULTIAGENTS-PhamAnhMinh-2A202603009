@@ -4,6 +4,7 @@ import asyncio
 import math
 import os
 import sys
+from tools import PythonREPLTool, CreateFileTool
 
 from .base_worker import BaseWorker, make_tools
 
@@ -16,11 +17,25 @@ class CodeAgent(BaseWorker):
     )
 
     def __init__(self, model=None, *, workspace="."):
+        self.repl_tool = PythonREPLTool(base_path=workspace)
+        self.create_file_tool = CreateFileTool(base_path=workspace)
         tool_map = {"validate_python": self.validate_python, "write_file": self.write_file,
                     "edit_file": self.edit_file, "execute_python": self.execute_python,
-                    "run_script": self.run_script}
+                    "run_script": self.run_script, "python_repl": self.python_repl,
+                    "create_file": self.create_file}
         super().__init__("code_agent", model, make_tools(tool_map), result_type="code",
                          system_prompt=self.SYSTEM_PROMPT, tool_map=tool_map, workspace=workspace)
+
+    def python_repl(self, code: str, timeout: float = 30) -> dict:
+        """Execute Python in the persistent resource-limited REPL."""
+        return self.repl_tool.invoke({"code": code, "timeout": timeout})
+
+    def create_file(self, filename: str, content: str) -> dict:
+        """Create a file inside the workspace."""
+        return self.create_file_tool.invoke({"filename": filename, "content": content})
+
+    def close(self):
+        self.repl_tool.close()
 
     async def run_script(self, path: str, timeout: float = 10) -> dict:
         """Run a trusted Python file in the workspace and return console output."""

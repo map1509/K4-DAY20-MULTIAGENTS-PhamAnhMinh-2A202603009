@@ -1,6 +1,7 @@
 """Deterministic evaluation against explicit expectations."""
 from collections.abc import Mapping
 import math
+from tools import ScoringTool, ValidationTool
 
 from .base_worker import BaseWorker, make_tools
 
@@ -14,10 +15,26 @@ class EvaluatorAgent(BaseWorker):
     )
 
     def __init__(self, model=None, *, workspace="."):
+        self.scoring_tool = ScoringTool()
+        self.validation_tool = ValidationTool()
         tool_map = {"score": self.score, "validate": self.validate,
-                    "quality_check": self.quality_check, "feedback_generator": self.feedback_generator}
+                    "quality_check": self.quality_check, "feedback_generator": self.feedback_generator,
+                    "score_result": self.score_result, "validate_result": self.validate_result}
         super().__init__("evaluator_agent", model, make_tools(tool_map), result_type="evaluation",
                          system_prompt=self.SYSTEM_PROMPT, tool_map=tool_map, workspace=workspace)
+
+    def score_result(self, result: str, criteria: dict | None = None, scores: dict | None = None) -> dict:
+        """Score text using explicit criterion scores or demonstration heuristics."""
+        inputs = {"result": result}
+        if criteria is not None:
+            inputs["criteria"] = criteria
+        if scores is not None:
+            inputs["scores"] = scores
+        return self.scoring_tool.invoke(inputs)
+
+    def validate_result(self, result: dict, required_fields: list[str]) -> dict:
+        """Validate fields of a result."""
+        return self.validation_tool.invoke({"result": result, "required_fields": required_fields})
 
     @staticmethod
     def quality_check(criteria: dict) -> dict:

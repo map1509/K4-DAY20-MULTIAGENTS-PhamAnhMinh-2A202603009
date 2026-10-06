@@ -3,6 +3,7 @@ import csv
 import math
 import sqlite3
 from pathlib import Path
+from tools import QueryDatabaseTool
 
 from .base_worker import BaseWorker, make_tools
 
@@ -20,6 +21,11 @@ class DataAgent(BaseWorker):
                     "pandas_analysis": self.pandas_analysis, "data_validation": self.data_validation}
         super().__init__("data_agent", model, make_tools(tool_map), result_type="data",
                          system_prompt=self.SYSTEM_PROMPT, tool_map=tool_map, workspace=workspace)
+        self.database_tool = None
+        if db_connection is not None:
+            if not isinstance(db_connection, (str, Path)):
+                raise ValueError("db_connection must be a relative SQLite database path")
+            self.database_tool = QueryDatabaseTool(self.resolve_path(str(db_connection)))
 
     def csv_parser(self, path: str, max_rows: int = 1000) -> dict:
         """Read CSV records and report whether the row limit truncated them."""
@@ -58,11 +64,15 @@ class DataAgent(BaseWorker):
                     issues.append({"row": index, "column": column, "issue": "missing value"})
         return {"valid": not issues, "issues": issues}
 
-    def query_database(self, query: str, parameters: list | None = None, max_rows: int = 1000) -> dict:
+    def query_database(self, query: str, limit: int = 1000, parameters: list | None = None) -> dict:
         """Query the configured SQLite database path (db_connection), read-only."""
-        if not isinstance(self.db_connection, (str, Path)):
+        if self.database_tool is None:
             raise ValueError("db_connection must be a relative SQLite database path; use query_sql otherwise")
-        return self.query_sql(str(self.db_connection), query, parameters or (), max_rows)
+        return self.database_tool.invoke({"query": query, "limit": limit, "parameters": parameters or ()})
+
+    def close(self):
+        if self.database_tool is not None:
+            self.database_tool.close()
 
     def analyze_csv(self, path, column, aggregation="sum"):
         if aggregation not in ("sum", "mean", "min", "max", "count"):

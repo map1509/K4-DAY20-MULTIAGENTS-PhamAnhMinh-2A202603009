@@ -168,6 +168,8 @@ class BaseWorker(BaseAgent):
                 result = await tool(**params)
             else:
                 result = await asyncio.to_thread(tool, **params)
+            if isinstance(result, Mapping) and result.get("status") == "error":
+                raise WorkerError(result.get("error", "Tool failed"))
             self.logger.info("Worker %s result type=%s operation=%s", self.name, self.result_type, operation)
             return {"type": self.result_type, "content": result}
         except Exception as exc:

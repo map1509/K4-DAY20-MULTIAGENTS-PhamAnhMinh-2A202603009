@@ -55,6 +55,16 @@ API đồng bộ `execute_tasks(tasks, timeout=60, message_queue=None)` được
 
 Kết quả mục 3.4/3.5: communication script đạt; workers giữ đúng 4 test theo đề, 4/4 đạt; bộ Coordinator hiện có vẫn đạt 14/14; standalone Coordinator đạt 3/3. Tất cả dùng mock, không gọi API mô hình.
 
+## Phần 4: Tools integration
+
+Đã bổ sung `src/tools/base_tool.py`, `database_tools.py`, `code_tools.py`, `evaluation_tools.py`. BaseTool quy định `name`, `description`, `validate_input`, `invoke`. QueryDatabaseTool dùng kết nối SQLite cache, chỉ đọc/SELECT, validation và giới hạn tối đa 1000 dòng; response có status/rows/columns/data, data tối đa 100 dòng. DataAgent dùng tool này cho `query_database`.
+
+PythonREPLTool chạy trong subprocess giữ trạng thái giữa các lần gọi, giới hạn output 10000 ký tự, timeout mặc định 30 giây, bộ nhớ mặc định 1024 MiB. Trên Windows dùng Job Object giới hạn bộ nhớ process; lỗi thiết lập giới hạn làm process dừng. Timeout hủy process và reset state. `_repl_worker.py` là thành phần nội bộ để thực thi yêu cầu và trả JSON. API keys không được chuyển qua environment. Kiểm tra AST chặn imports nguy hiểm và truy cập không được phép; đây là môi trường cục bộ có hạn chế, không phải ranh giới bảo mật cho mã độc (thư viện được cho phép vẫn có khả năng truy cập hệ điều hành).
+
+CreateFileTool tạo file UTF-8 trong base_path, chặn đường dẫn tuyệt đối, traversal và đường dẫn resolve ra ngoài thư mục. ScoringTool trả scores/weighted_score/grade; có thể nhận điểm tiêu chí tường minh hoặc dùng heuristic văn bản minh họa của đề. Heuristic không xác minh độ chính xác thực tế, trường method nêu cách chấm. ValidationTool kiểm tra các field bắt buộc. CodeAgent và EvaluatorAgent đã tích hợp các tool này.
+
+Kết quả: đúng 4 test trong `tests/test_04_tools.py` đạt, 4 test workers vẫn đạt. `scripts/test_tool_integration.py` đạt 3/3: DataAgent lấy 50 dòng sales năm 2026, CodeAgent dùng số liệu đó tạo `outputs/sales_chart.png`, Evaluator tính điểm 85/B từ điểm rubric đầu vào rồi kiểm tra format. Script dùng SQLite tạm và matplotlib cục bộ; không gọi mô hình. Đã thêm matplotlib vào dependencies.
+
 Test `tests/test_03_workers.py` kiểm tra CSV, SQL chỉ đọc, dữ liệu lỗi, tool fail, code tạo/sửa/thực thi/timeout, khóa không được chuyển qua env, validation/scoring, đường dẫn và luồng Coordinator với workers thật. Không gọi API mô hình.
 
 Kết quả: `python -m pytest tests/test_03_workers.py tests/test_02_coordinator.py -v` đạt **21 passed** (7 test workers và 14 test Coordinator). Lần chạy trong sandbox bị chặn quyền thư mục tạm của pytest; chạy lại với quyền được cấp đã đạt.
